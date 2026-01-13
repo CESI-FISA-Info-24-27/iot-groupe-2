@@ -1,0 +1,30 @@
+{
+  "name": "iot-backend",
+  "version": "1.0.0",
+  "description": "IoT Backend API with MQTT and WebSocket support",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "mqtt": "^5.3.5",
+    "ws": "^8.16.0",
+    "mongodb": "^6.3.0",
+    "dotenv": "^16.3.1",
+    "cors": "^2.8.5",
+    "body-parser": "^1.20.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "keywords": [
+    "iot",
+    "mqtt",
+    "websocket",
+    "sensors"
+  ],
+  "author": "",
+  "license": "MIT"
+}
