@@ -1,0 +1,20 @@
+services:
+  backend:
+    build: ./backend
+    container_name: backend
+    environment:
+      - PORT=${BACKEND_ORIGIN_PORT}
+    env_file:
+      - .env
+    ports:
+      - "${BACKEND_ORIGIN_PORT}:${BACKEND_DEST_PORT}"
+    volumes:
+      - ./backend:/app
+    restart: unless-stopped
+
+  flutter:
+    image: ghcr.io/cirruslabs/flutter:stable
+    container_name: flutter
+    volumes:
+      - ./:/app
+    restart: unless-stopped
