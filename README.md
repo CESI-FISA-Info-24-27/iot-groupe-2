@@ -66,11 +66,11 @@ Le projet est réalisé par une **squad de 4 ingénieurs**. Les rôles technique
 
 |   Semaine | Embedded Lead | Edge Ops Lead | Backend Architect | Mobile & UX Lead |
 | --------: | ------------- | ------------- | ----------------- | ---------------- |
-| Semaine 1 | Benjamin      | Dylan         | Lucas             | Quentin          |
-| Semaine 2 | Dylan         | Lucas         | Quentin           | Benjamin         |
-| Semaine 3 | Lucas         | Quentin       | Benjamin          | Dylan            |
-| Semaine 4 | Quentin       | Benjamin      | Dylan             | Lucas            |
-| Semaine 5 | Benjamin      | Dylan         | Lucas             | Quentin          |
+| Semaine 1 | Quentin       | Dylan         | Lucas             | Benjamin         |
+| Semaine 2 | Dylan         | Lucas         | Benjamin          | Quentin          |
+| Semaine 3 | Lucas         | Benjamin      | Quentin           | Dylan            |
+| Semaine 4 | Benjamin      | Quentin       | Dylan             | Lucas            |
+| Semaine 5 | Quentin       | Dylan         | Lucas             | Benjamin         |
 
 > Chaque semaine, le référent est responsable des choix techniques, de la stabilité et de la validation finale de son périmètre.
 
