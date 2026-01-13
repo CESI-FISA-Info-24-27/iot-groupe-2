@@ -122,3 +122,5 @@ app.*.symbols
 .env
 node_modules
 package-lock.json
+src/gateway/config/
+__pycache__/

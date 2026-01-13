@@ -1,10 +1,10 @@
 ble:
   scan_interval: 5
-  device_name: "BLE_Device"
+  device_name: "VV2"
   characteristic_uuid: "12345678-1234-5678-1234-56789abcdef0"
 
 mqtt:
-  broker: "mqtt-broker"
+  broker: "localhost"
   port: 1883
   topic: "ble/data"
   client_id: "ble-gateway"
