@@ -1,52 +1,39 @@
 const http = require("http");
-require("dotenv").config();
+const app = require("./app");
+const config = require("./config/env");
+const mqttService = require("./services/mqtt.service");
+const influxService = require("./services/influx.service");
+const wsServer = require("./websocket/ws");
 
-const { createApp } = require("./app");
-const { createMqttService } = require("./services/mqtt.service");
-const { createDbService } = require("./services/db.service");
-const { setupWebSocket } = require("./websocket/ws");
+const PORT = config.port;
 
-// Routes
-const { createSensorsRoutes } = require("./routes/sensors.routes");
-
-const PORT = parseInt(process.env.PORT || "8000", 10);
-
-async function main() {
-  // Init services
-  const mqttService = createMqttService();
+async function startServer() {
+  influxService.initialize();
   mqttService.connect();
 
-  const dbService = createDbService();
-  await dbService.connect();
-
-  // Routes (tu peux injecter services dedans)
-  const sensorsRoutes = createSensorsRoutes({ dbService, mqttService });
-
-  const app = createApp({ sensorsRoutes });
-
-  // Health check plus riche
   app.get("/health", async (req, res) => {
+    const mqttStatus = mqttService.isConnected();
+    const influxStatus = await influxService.healthCheck();
+    const status = mqttStatus && influxStatus ? "healthy" : "degraded";
+
     res.json({
-      status: "healthy",
-      timestamp: Date.now(),
+      status,
       services: {
-        mqtt: mqttService.isConnected() ? "up" : "down",
-        db: dbService.isConnected() ? "up" : "down",
+        mqtt: mqttStatus ? "up" : "down",
+        influxdb: influxStatus ? "up" : "down",
       },
     });
   });
 
   const server = http.createServer(app);
-
-  // WS
-  setupWebSocket(server);
+  wsServer.initialize(server);
 
   server.listen(PORT, () => {
     console.log(`EcoGuard API listening on port ${PORT}`);
   });
 }
 
-main().catch((err) => {
-  console.error("Fatal error:", err);
+startServer().catch((error) => {
+  console.error("Fatal error:", error);
   process.exit(1);
 });

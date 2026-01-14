@@ -1,18 +1,20 @@
 const express = require("express");
 const cors = require("cors");
+const sensorsRoutes = require("./routes/sensors.routes");
 
-function createApp({ sensorsRoutes }) {
-  const app = express();
+const app = express();
 
-  app.use(cors());
-  app.use(express.json());
+app.use(express.json());
+app.use(
+  cors({
+    origin: process.env.CORS_ORIGIN || "*",
+  })
+);
 
-  app.get("/", (req, res) => res.json({ name: "EcoGuard API", status: "ok" }));
+app.get("/", (req, res) => {
+  res.json({ message: "🚀 EcoGuard 360 API is running!" });
+});
 
-  // Routes métiers
-  app.use("/api/sensors", sensorsRoutes);
+app.use("/api/sensors", sensorsRoutes);
 
-  return app;
-}
-
-module.exports = { createApp };
+module.exports = app;

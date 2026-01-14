@@ -1,6 +1,5 @@
 const WebSocket = require("ws");
 const mqttService = require("../services/mqtt.service");
-const config = require("../config/env");
 
 class WebSocketServer {
   constructor() {

@@ -2,24 +2,19 @@ require("dotenv").config();
 
 module.exports = {
   port: process.env.PORT || 3000,
-  wsPort: process.env.WS_PORT || 8080,
 
   mqtt: {
-    broker: process.env.MQTT_BROKER || "mqtt://localhost:1883",
+    host: process.env.MQTT_HOST || "localhost",
+    port: parseInt(process.env.MQTT_PORT || "1883", 10),
     username: process.env.MQTT_USERNAME || "",
     password: process.env.MQTT_PASSWORD || "",
-    topics: {
-      sensors: process.env.MQTT_TOPIC_SENSORS || "iot/sensors/#",
-      camera: process.env.MQTT_TOPIC_CAMERA || "iot/camera/#",
-    },
   },
 
-  mongodb: {
-    uri: process.env.MONGODB_URI || "mongodb://localhost:27017/iot-db",
-    options: {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    },
+  influx: {
+    url: process.env.INFLUX_URL || "http://localhost:8086",
+    org: process.env.INFLUX_ORG || "EcoGuard",
+    bucket: process.env.INFLUX_BUCKET || "sensors",
+    token: process.env.INFLUX_TOKEN || "",
   },
 
   env: process.env.NODE_ENV || "development",

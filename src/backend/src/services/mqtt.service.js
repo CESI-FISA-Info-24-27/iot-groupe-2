@@ -1,6 +1,5 @@
 const mqtt = require("mqtt");
 const config = require("../config/env");
-const dbService = require("./db.service");
 
 class MqttService {
   constructor() {
@@ -15,21 +14,17 @@ class MqttService {
       reconnectPeriod: 5000,
     };
 
-    this.client = mqtt.connect(config.mqtt.broker, options);
+    const brokerUrl = `mqtt://${config.mqtt.host}:${config.mqtt.port}`;
+    this.client = mqtt.connect(brokerUrl, options);
 
     this.client.on("connect", () => {
       console.log("✓ Connected to MQTT broker");
-      this.subscribe(config.mqtt.topics.sensors);
-      this.subscribe(config.mqtt.topics.camera);
     });
 
     this.client.on("message", async (topic, message) => {
       try {
         const payload = JSON.parse(message.toString());
         console.log(`MQTT message on ${topic}:`, payload);
-
-        // Save to database
-        await dbService.saveSensorData(topic, payload);
 
         // Notify all registered callbacks
         this.callbacks.forEach((callback) => callback(topic, payload));
@@ -63,14 +58,18 @@ class MqttService {
     }
   }
 
-  publish(topic, message) {
+  publish(topic, payload, options = { qos: 1 }) {
     if (this.client && this.client.connected) {
-      this.client.publish(topic, JSON.stringify(message));
+      this.client.publish(topic, JSON.stringify(payload), options);
     }
   }
 
   onMessage(callback) {
     this.callbacks.push(callback);
+  }
+
+  isConnected() {
+    return Boolean(this.client && this.client.connected);
   }
 
   disconnect() {
