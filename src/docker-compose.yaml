@@ -1,0 +1,40 @@
+services:
+  api: # Backend Express
+    build: ./backend
+    container_name: api
+    environment:
+      - PORT=${BACKEND_ORIGIN_PORT}
+    env_file:
+      - .env
+    ports:
+      - "${BACKEND_ORIGIN_PORT}:${BACKEND_DEST_PORT}"
+    volumes:
+      - ./backend:/app
+    restart: unless-stopped
+  
+  mqtt-broker: # Serveur MQTT recevant les données du bridge
+    image: eclipse-mosquitto:2.0
+    container_name: mqtt-broker
+    ports:
+      - "${MQTT_BROKER_ORIGIN_PORT?:MQTT_BROKER_ORIGIN_PORT manquant}:${MQTT_BROKER_DEST_PORT?:MQTT_BROKER_DEST_PORT manquant}"
+    volumes:
+      - ./mqtt-broker/config/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - ./mqtt-broker/data:/mosquitto/data
+      - ./mqtt-broker/log:/mosquitto/log
+    restart: unless-stopped
+
+
+  gateway: # Bridge BLE-MQTT
+    build: ./gateway
+    container_name: gateway
+    privileged: true
+    volumes:
+      - /var/run/dbus:/var/run/dbus
+      - ./gateway/config:/app/config
+    environment:
+      - PYTHONUNBUFFERED=1
+      - CONFIG_FILE=${BRIDGE_BLE_MQTT_CONFIG_FILE?:BRIDGE_BLE_MQTT_CONFIG_FILE manquant}
+    restart: unless-stopped
+    network_mode: "host"
+    depends_on:
+      - mqtt-broker
