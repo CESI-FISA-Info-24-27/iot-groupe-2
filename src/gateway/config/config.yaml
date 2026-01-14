@@ -1,0 +1,10 @@
+ble:
+  scan_interval: 5
+  device_name: "BLE Device Name"
+  characteristic_uuid: "12345678-1234-5678-1234-56789abcdef0"
+
+mqtt:
+  broker: "localhost"
+  port: 1883
+  topic: "cesiot"
+  client_id: "ble-gateway"

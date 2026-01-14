@@ -1,0 +1,113 @@
+name: CI CesIoT
+
+on:
+    push:
+    pull_request:
+
+jobs:
+  lint-python: # Test de qualité du code Python (Backend + Gateway)
+    name: Lint Python Code
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      
+      - name: Install linters
+        run: |
+          pip install black flake8 pylint
+      
+      - name: Run Black (formatter check)
+        run: |
+          black --check src/backend/ src/gateway/ || echo "⚠️ Code non formaté détecté"
+        continue-on-error: true
+      
+      - name: Run Flake8 (style guide)
+        run: |
+          flake8 src/backend/ src/gateway/ --max-line-length=120 || echo "⚠️ Problèmes de style détectés"
+        continue-on-error: true
+      
+      - name: Run Pylint (code quality)
+        run: |
+          pylint src/backend/ src/gateway/ || echo "⚠️ Problèmes de qualité détectés"
+        continue-on-error: true
+
+  lint-cpp: # Test de qualité du code C++ (Embedded)
+    name: Lint C++ Code
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Install CppCheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cppcheck
+      
+      - name: Run CppCheck
+        run: |
+          cppcheck --enable=all --inconclusive --xml --xml-version=2 embedded/ 2> cppcheck-report.xml || echo "⚠️ CppCheck warnings detected"
+          cppcheck --enable=all src/embedded/ || echo "⚠️ Code quality issues detected"
+        continue-on-error: true
+
+  build-docker: # Test du build des images Docker
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      
+      - name: Build Backend Image
+        run: |
+          docker build -t cesiot-backend:ci ./src/backend || echo "⚠️ Backend build failed"
+        continue-on-error: true
+      
+      - name: Build Gateway Image
+        run: |
+          docker build -t cesiot-gateway:ci ./gateway || echo "⚠️ Gateway build failed"
+        continue-on-error: true
+
+  test-docker-compose: # Test du build du compose global
+    name: Test Docker Compose
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Prepare .env
+        working-directory: src
+        run: |
+          cp .env.example .env
+
+      - name: Validate docker-compose.yml
+        working-directory: src
+        run: |
+          docker compose config
+      
+      - name: Start infrastructure services
+        working-directory: src
+        run: |
+          docker compose up -d
+          sleep 10
+      
+      - name: Check services health
+        working-directory: src
+        run: |
+          docker compose ps
+          docker compose logs
+      
+      - name: Stop services
+        working-directory: src
+        run: |
+          docker compose down -v
