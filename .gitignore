@@ -129,5 +129,4 @@ src/databases/influxdb/
 src/mqtt-broker/data/
 src/mqtt-broker/log/
 
-src/gateway/config/
 __pycache__/
