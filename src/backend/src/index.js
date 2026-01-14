@@ -1,18 +1,52 @@
-import express from "express";
+const http = require("http");
+require("dotenv").config();
 
-const app = express();
-const PORT = process.env.BACKEND_ORIGIN_PORT;
+const { createApp } = require("./app");
+const { createMqttService } = require("./services/mqtt.service");
+const { createDbService } = require("./services/db.service");
+const { setupWebSocket } = require("./websocket/ws");
 
-app.use(express.json());
+// Routes
+const { createSensorsRoutes } = require("./routes/sensors.routes");
 
-app.get("/", (req, res) => {
-  res.json({ message: "🚀 API Express is running!" });
-});
+const PORT = parseInt(process.env.PORT || "8000", 10);
 
-app.get("/health", (req, res) => {
-  res.status(200).send("OK");
-});
+async function main() {
+  // Init services
+  const mqttService = createMqttService();
+  mqttService.connect();
 
-app.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
+  const dbService = createDbService();
+  await dbService.connect();
+
+  // Routes (tu peux injecter services dedans)
+  const sensorsRoutes = createSensorsRoutes({ dbService, mqttService });
+
+  const app = createApp({ sensorsRoutes });
+
+  // Health check plus riche
+  app.get("/health", async (req, res) => {
+    res.json({
+      status: "healthy",
+      timestamp: Date.now(),
+      services: {
+        mqtt: mqttService.isConnected() ? "up" : "down",
+        db: dbService.isConnected() ? "up" : "down",
+      },
+    });
+  });
+
+  const server = http.createServer(app);
+
+  // WS
+  setupWebSocket(server);
+
+  server.listen(PORT, () => {
+    console.log(`EcoGuard API listening on port ${PORT}`);
+  });
+}
+
+main().catch((err) => {
+  console.error("Fatal error:", err);
+  process.exit(1);
 });
