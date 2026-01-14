@@ -123,5 +123,11 @@ app.*.symbols
 .env
 node_modules
 package-lock.json
+
+src/databases/data/
+src/databases/influxdb/
+src/mqtt-broker/data/
+src/mqtt-broker/log/
+
 src/gateway/config/
 __pycache__/
