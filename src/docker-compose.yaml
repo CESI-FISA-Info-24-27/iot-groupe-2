@@ -11,6 +11,15 @@ services:
     volumes:
       - ./backend:/app
     restart: unless-stopped
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"const http=require('http'); const req=http.get({host:'127.0.0.1', port: process.env.PORT, path:'/health'}, res => {process.exit(res.statusCode===200?0:1)}).on('error', ()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
   
   mqtt-broker: # Serveur MQTT recevant les données du bridge
     image: eclipse-mosquitto:2.0
@@ -22,6 +31,12 @@ services:
       - ./mqtt-broker/data:/mosquitto/data
       - ./mqtt-broker/log:/mosquitto/log
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -h localhost -t '$$SYS/broker/uptime' -C 1 -W 2 || exit 1"]
+      interval: 10s
+      timeout: 7s
+      retries: 5
+      start_period: 10s
 
 
   gateway: # Bridge BLE-MQTT
@@ -34,7 +49,37 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - CONFIG_FILE=${BRIDGE_BLE_MQTT_CONFIG_FILE?:BRIDGE_BLE_MQTT_CONFIG_FILE manquant}
+      - MQTT_BROKER_HOST=localhost
+      - MQTT_BROKER_PORT=${MQTT_BROKER_DEST_PORT?:MQTT_BROKER_DEST_PORT manquant}
     restart: unless-stopped
     network_mode: "host"
     depends_on:
-      - mqtt-broker
+      mqtt-broker:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import socket,os,sys; s=socket.socket(); s.settimeout(2); h=os.environ.get('MQTT_BROKER_HOST','localhost'); p=int(os.environ.get('MQTT_BROKER_PORT','1883')); s.connect((h,p)); s.close()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  influxdb: # Base de données
+    image: influxdb:2.7
+    container_name: influxdb
+    environment:
+      - INFLUXDB_INIT_USERNAME=${INFLUXDB_INIT_USERNAME?:INFLUXDB_INIT_USERNAME manquant}
+      - INFLUXDB_INIT_PASSWORD=${INFLUXDB_INIT_PASSWORD?:INFLUXDB_INIT_PASSWORD manquant}
+      - INFLUXDB_INIT_ORG=${INFLUXDB_INIT_ORG?:INFLUXDB_INIT_ORG manquant}
+      - INFLUXDB_INIT_BUCKET=${INFLUXDB_INIT_BUCKET?:INFLUXDB_INIT_BUCKET manquant}
+      - INFLUXDB_INIT_ADMIN_TOKEN=${INFLUXDB_INIT_ADMIN_TOKEN?:INFLUXDB_INIT_ADMIN_TOKEN manquant}
+    ports:
+      - "${INFLUXDB_ORIGIN_PORT?:INFLUXDB_ORIGIN_PORT manquant}:${INFLUXDB_DEST_PORT?:INFLUXDB_DEST_PORT manquant}"
+    volumes:
+      - ./databases/influxdb:/var/lib/influxdb2
+      - ./databases/config:/etc/influxdb2
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS --max-time 3 http://localhost:${INFLUXDB_DEST_PORT?:INFLUXDB_DEST_PORT manquant}/health | grep '\"status\":\"pass\"' || exit 1"]
+      interval: 10s
+      timeout: 7s
+      retries: 5
