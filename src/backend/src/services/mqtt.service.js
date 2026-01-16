@@ -5,6 +5,7 @@ class MqttService {
   constructor() {
     this.client = null;
     this.callbacks = [];
+    this.subscriptions = [];
   }
 
   connect() {
@@ -19,18 +20,37 @@ class MqttService {
 
     this.client.on("connect", () => {
       console.log("✓ Connected to MQTT broker");
+      this.subscriptions.forEach(({ filter }) => {
+        this.client.subscribe(filter, (err) => {
+          if (err) {
+            console.error(`Failed to subscribe to ${filter}:`, err);
+          } else {
+            console.log(`✓ Subscribed to ${filter}`);
+          }
+        });
+      });
     });
 
     this.client.on("message", async (topic, message) => {
-      try {
-        const payload = JSON.parse(message.toString());
-        console.log(`MQTT message on ${topic}:`, payload);
+      const rawMessage = message.toString();
+      let payload = null;
 
-        // Notify all registered callbacks
-        this.callbacks.forEach((callback) => callback(topic, payload));
+      try {
+        payload = JSON.parse(rawMessage);
+        console.log(`MQTT message on ${topic}:`, payload);
       } catch (error) {
         console.error("Error processing MQTT message:", error);
       }
+
+      // Notify all registered callbacks
+      this.callbacks.forEach((callback) => callback(topic, payload));
+
+      // Notify matching topic handlers with raw message access
+      this.subscriptions.forEach(({ filter, handler }) => {
+        if (this.matchesTopic(filter, topic)) {
+          handler(topic, payload, rawMessage);
+        }
+      });
     });
 
     this.client.on("error", (error) => {
@@ -46,16 +66,26 @@ class MqttService {
     });
   }
 
-  subscribe(topic) {
+  subscribe(filter, handler) {
+    if (handler) {
+      this.subscriptions.push({ filter, handler });
+    } else {
+      this.subscriptions.push({ filter, handler: () => {} });
+    }
+
     if (this.client && this.client.connected) {
-      this.client.subscribe(topic, (err) => {
+      this.client.subscribe(filter, (err) => {
         if (err) {
-          console.error(`Failed to subscribe to ${topic}:`, err);
+          console.error(`Failed to subscribe to ${filter}:`, err);
         } else {
-          console.log(`✓ Subscribed to ${topic}`);
+          console.log(`✓ Subscribed to ${filter}`);
         }
       });
     }
+  }
+
+  subscribeTelemetry(handler) {
+    this.subscribe("sensors/+/telemetry", handler);
   }
 
   publish(topic, payload, options = { qos: 1 }) {
@@ -76,6 +106,34 @@ class MqttService {
     if (this.client) {
       this.client.end();
     }
+  }
+
+  matchesTopic(filter, topic) {
+    const filterLevels = filter.split("/");
+    const topicLevels = topic.split("/");
+
+    for (let i = 0; i < filterLevels.length; i += 1) {
+      const filterLevel = filterLevels[i];
+      const topicLevel = topicLevels[i];
+
+      if (filterLevel === "#") {
+        return true;
+      }
+
+      if (topicLevel === undefined) {
+        return false;
+      }
+
+      if (filterLevel === "+") {
+        continue;
+      }
+
+      if (filterLevel !== topicLevel) {
+        return false;
+      }
+    }
+
+    return filterLevels.length === topicLevels.length;
   }
 }
 

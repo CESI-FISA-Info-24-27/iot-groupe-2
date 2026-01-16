@@ -1,15 +1,30 @@
-const { InfluxDB } = require("@influxdata/influxdb-client");
+const { InfluxDB, Point } = require("@influxdata/influxdb-client");
 const config = require("../config/env");
 
 class InfluxService {
   constructor() {
     this.client = null;
     this.queryApi = null;
+    this.writeApi = null;
+    this.flushTimer = null;
   }
 
   initialize() {
     this.client = new InfluxDB({ url: config.influx.url, token: config.influx.token });
     this.queryApi = this.client.getQueryApi(config.influx.org);
+    this.writeApi = this.client.getWriteApi(
+      config.influx.org,
+      config.influx.bucket,
+      "ms"
+    );
+
+    if (!this.flushTimer) {
+      this.flushTimer = setInterval(() => {
+        this.flush().catch((error) => {
+          console.error("InfluxDB flush failed:", error);
+        });
+      }, 5000);
+    }
   }
 
   async healthCheck() {
@@ -66,6 +81,30 @@ from(bucket: "${config.influx.bucket}")
         },
       });
     });
+  }
+
+  writeTelemetry({ room, sensor_id, metric, value, ts }) {
+    if (!this.writeApi) {
+      return;
+    }
+
+    const timestamp = Number.isFinite(Number(ts)) ? Number(ts) : Date.now();
+    const numericValue = Number(value);
+
+    const point = new Point("telemetry")
+      .tag("room", room)
+      .tag("sensor_id", sensor_id)
+      .tag("metric", metric)
+      .floatField("value", numericValue)
+      .timestamp(timestamp);
+
+    this.writeApi.writePoint(point);
+  }
+
+  async flush() {
+    if (this.writeApi) {
+      await this.writeApi.flush();
+    }
   }
 }
 
