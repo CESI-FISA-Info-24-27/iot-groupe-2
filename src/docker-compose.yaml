@@ -14,6 +14,7 @@ services:
       - "${BACKEND_ORIGIN_PORT?:BACKEND_ORIGIN_PORT manquant}:${BACKEND_DEST_PORT?:BACKEND_DEST_PORT manquant}"
     volumes:
       - ./backend:/app
+      - /app/node_modules
     restart: unless-stopped
     depends_on:
       influxdb:

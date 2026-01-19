@@ -23,7 +23,6 @@ router.get("/history", async (req, res) => {
   }
 });
 
-<<<<<<< HEAD
 // POST /api/sensors/action { target, payload }
 router.post("/action", (req, res) => {
   const { target, payload } = req.body || {};
@@ -51,6 +50,4 @@ router.post("/action", (req, res) => {
   });
 });
 
-=======
->>>>>>> 866d33f (Feature(Backend) - Initialize backend structure with essential services, routes, and configuration for IoT application)
 module.exports = router;
