@@ -3,10 +3,10 @@ FROM node:20-alpine
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci || npm install
+RUN npm i
 
 COPY src ./src
 
-EXPOSE 80
+EXPOSE ${BACKEND_ORIGIN_PORT}
 
-CMD ["node", "src/index.js"]
+CMD ["npm", "run", "start"]

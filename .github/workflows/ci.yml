@@ -99,7 +99,7 @@ jobs:
         working-directory: src
         run: |
           docker compose up -d
-          sleep 10
+          sleep 180
       
       - name: Check services health
         working-directory: src
