@@ -6,6 +6,7 @@
 *.swp
 .buildlog/
 .history
+node_modules/
 
 
 
@@ -117,3 +118,10 @@ app.*.symbols
 !**/ios/**/default.perspectivev3
 !/packages/flutter_tools/test/data/dart_dependencies_test/**/.packages
 !/dev/ci/**/Gemfile.lock
+
+# Repo-Specific Gitignore Rules
+.env
+node_modules
+package-lock.json
+src/gateway/config/
+__pycache__/
