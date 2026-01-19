@@ -17,6 +17,9 @@ class InfluxService {
       config.influx.bucket,
       "ms"
     );
+    console.log(this.client);
+    console.log(this.queryApi);
+    console.log(this.writeApi);
 
     if (!this.flushTimer) {
       this.flushTimer = setInterval(() => {
