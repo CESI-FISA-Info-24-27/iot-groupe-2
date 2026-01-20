@@ -128,6 +128,7 @@ package-lock.json
 src/databases/data/
 src/databases/config/
 src/databases/influxdb/
+src/mqtt-broker/config/passwd
 src/mqtt-broker/data/
 src/mqtt-broker/log/
 

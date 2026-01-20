@@ -6,6 +6,8 @@ services:
       - PORT=${BACKEND_ORIGIN_PORT?:BACKEND_ORIGIN_PORT manquant}
       - MQTT_HOST=mqtt-broker
       - MQTT_PORT=${MQTT_BROKER_DEST_PORT?:MQTT_BROKER_DEST_PORT manquant}
+      - MQTT_USERNAME=${MQTT_BROKER_USERNAME?:MQTT_BROKER_USERNAME manquant}
+      - MQTT_PASSWORD=${MQTT_BROKER_PASSWORD?:MQTT_BROKER_PASSWORD manquant}
       - INFLUX_URL=http://influxdb:${INFLUXDB_DEST_PORT?:INFLUXDB_DEST_PORT manquant}
       - INFLUX_ORG=${INFLUXDB_INIT_ORG?:INFLUXDB_INIT_ORG manquant}
       - INFLUX_BUCKET=${INFLUXDB_INIT_BUCKET?:INFLUXDB_INIT_BUCKET manquant}
@@ -28,17 +30,20 @@ services:
       retries: 10
 
   mqtt-broker: # Serveur MQTT recevant les données du bridge
-    image: eclipse-mosquitto:2.0
+    build: ./mqtt-broker
     container_name: mqtt-broker
     ports:
       - "${MQTT_BROKER_ORIGIN_PORT?:MQTT_BROKER_ORIGIN_PORT manquant}:${MQTT_BROKER_DEST_PORT?:MQTT_BROKER_DEST_PORT manquant}"
     volumes:
-      - ./mqtt-broker/config/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - ./mqtt-broker/config:/mosquitto/config
       - ./mqtt-broker/data:/mosquitto/data
       - ./mqtt-broker/log:/mosquitto/log
     restart: unless-stopped
+    environment:
+      - MOSQUITTO_USERNAME=${MQTT_BROKER_USERNAME?:MQTT_BROKER_USERNAME manquant}
+      - MOSQUITTO_PASSWORD=${MQTT_BROKER_PASSWORD?:MQTT_BROKER_PASSWORD manquant}
     healthcheck:
-      test: ["CMD-SHELL", "mosquitto_sub -h localhost -t '$$SYS/broker/uptime' -C 1 -W 2 || exit 1"]
+      test: ["CMD-SHELL", "mosquitto_sub -h localhost -u ${MQTT_BROKER_USERNAME} -P ${MQTT_BROKER_PASSWORD} -t '$$SYS/broker/uptime' -C 1 -W 2 || exit 1"]
       interval: 10s
       timeout: 7s
       retries: 5
