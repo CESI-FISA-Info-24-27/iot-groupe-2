@@ -56,6 +56,18 @@ jobs:
           cppcheck --enable=all src/embedded/ || echo "⚠️ Code quality issues detected"
         continue-on-error: true
 
+  sonarqube:
+    name: SonarQube
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v6
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
   build-docker: # Test du build des images Docker
     name: Build Docker Images
     runs-on: ubuntu-latest
