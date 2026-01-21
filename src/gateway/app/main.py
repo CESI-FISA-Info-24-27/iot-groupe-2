@@ -1,23 +1,38 @@
-import yaml
 import asyncio
-import os
-from ble_client import BLEClient
+import signal
+from config import load_config
 from mqtt_client import MQTTClient
-from bridge import BLEMQTTBridge
+from ble_manager import BLEManager
+from command_handler import CommandHandler
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-config_path = os.environ.get("CONFIG_FILE", os.path.join(BASE_DIR, "../config/config.yaml"))
 
-with open(config_path, 'r') as f:
-    config = yaml.safe_load(f)
+async def run() -> None:
+    config = load_config()
 
-ble = BLEClient(config["ble"])
-mqtt = MQTTClient(config["mqtt"])
+    mqtt = MQTTClient(config.mqtt)
+    mqtt.connect()
 
-bridge = BLEMQTTBridge(
-    ble,
-    mqtt,
-    config["ble"]["scan_interval"]
-)
+    ble_manager = BLEManager(config, mqtt)
+    command_handler = CommandHandler(config, mqtt, ble_manager)
 
-asyncio.run(bridge.run())
+    await ble_manager.start()
+    command_handler.start()
+
+    stop_event = asyncio.Event()
+
+    def _handle_stop(*_args) -> None:
+        stop_event.set()
+
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, _handle_stop)
+
+    await stop_event.wait()
+
+    command_handler.stop()
+    await ble_manager.stop()
+    mqtt.disconnect()
+
+
+if __name__ == "__main__":
+    asyncio.run(run())
