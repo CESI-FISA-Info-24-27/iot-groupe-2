@@ -20,10 +20,10 @@ jobs:
           username: berouddylan
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build image with docker-compose
+      - name: Build image with docker compose
         run: |
           cd ./src
-          docker-compose build
+          docker compose build
 
       - name: Push all images
         run: |
