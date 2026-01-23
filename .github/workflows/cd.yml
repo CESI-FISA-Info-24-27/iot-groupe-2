@@ -20,9 +20,14 @@ jobs:
           username: berouddylan
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build image with docker compose
+      - name: Prepare .env
+        working-directory: src
         run: |
-          cd ./src
+          cp .env.example .env
+
+      - name: Build image with docker compose
+        working-directory: src
+        run: |
           docker compose build
 
       - name: Push all images
