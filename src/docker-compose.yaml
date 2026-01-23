@@ -1,5 +1,5 @@
 services:
-  api: # Backend Express
+  api: # Backend FastAPI
     build: ./backend
     container_name: api
     environment:
@@ -16,7 +16,6 @@ services:
       - "${BACKEND_ORIGIN_PORT?:BACKEND_ORIGIN_PORT manquant}:${BACKEND_DEST_PORT?:BACKEND_DEST_PORT manquant}"
     volumes:
       - ./backend:/app
-      - /app/node_modules
     restart: unless-stopped
     depends_on:
       influxdb:
@@ -24,7 +23,7 @@ services:
       mqtt-broker:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"const http=require('http'); const req=http.get({host:'127.0.0.1', port: process.env.PORT, path:'/health'}, res => {process.exit(res.statusCode===200?0:1)}).on('error', ()=>process.exit(1))\""]
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:${BACKEND_ORIGIN_PORT}/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -43,11 +42,14 @@ services:
       - MOSQUITTO_USERNAME=${MQTT_BROKER_USERNAME?:MQTT_BROKER_USERNAME manquant}
       - MOSQUITTO_PASSWORD=${MQTT_BROKER_PASSWORD?:MQTT_BROKER_PASSWORD manquant}
     healthcheck:
-      test: ["CMD-SHELL", "mosquitto_sub -h localhost -u ${MQTT_BROKER_USERNAME} -P ${MQTT_BROKER_PASSWORD} -t '$$SYS/broker/uptime' -C 1 -W 2 || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "mosquitto_sub -h localhost -u ${MQTT_BROKER_USERNAME} -P ${MQTT_BROKER_PASSWORD} -t '$$SYS/broker/uptime' -C 1 -W 2 || exit 1",
+        ]
       interval: 10s
       timeout: 7s
       retries: 5
-
 
   gateway: # Bridge BLE-MQTT
     build: ./gateway
@@ -80,7 +82,11 @@ services:
       mqtt-broker:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import socket,os,sys; s=socket.socket(); s.settimeout(2); h=os.environ.get('MQTT_BROKER_HOST','localhost'); p=int(os.environ.get('MQTT_BROKER_PORT','1883')); s.connect((h,p)); s.close()\""]
+      test:
+        [
+          "CMD-SHELL",
+          'python -c "import socket,os,sys; s=socket.socket(); s.settimeout(2); h=os.environ.get(''MQTT_BROKER_HOST'',''localhost''); p=int(os.environ.get(''MQTT_BROKER_PORT'',''1883'')); s.connect((h,p)); s.close()"',
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -101,7 +107,11 @@ services:
       - ./databases/influxdb:/var/lib/influxdb2
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS --max-time 15 http://localhost:${INFLUXDB_DEST_PORT?:INFLUXDB_DEST_PORT manquant}/health | grep '\"status\":\"pass\"' || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          'curl -fsS --max-time 15 http://localhost:${INFLUXDB_DEST_PORT?:INFLUXDB_DEST_PORT manquant}/health | grep ''"status":"pass"'' || exit 1',
+        ]
       interval: 10s
       timeout: 10s
       retries: 50
