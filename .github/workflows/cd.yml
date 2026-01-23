@@ -20,9 +20,17 @@ jobs:
           username: berouddylan
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build & Push image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./src
-          push: true
-          tags: berouddylan/cesiot:latest
+      - name: Build image with docker-compose
+        run: |
+          cd ./src
+          docker-compose build
+
+      - name: Push all images
+        run: |
+          docker tag src-api:latest berouddylan/cesiot-api:latest
+          docker tag src-mqtt-broker:latest berouddylan/cesiot-mqtt-broker:latest
+          docker tag src-mobile_app:latest berouddylan/cesiot-mobile_app:latest
+
+          docker push berouddylan/cesiot-api:latest
+          docker push berouddylan/cesiot-mqtt-broker:latest
+          docker push berouddylan/cesiot-mobile_app:latest
