@@ -2,12 +2,14 @@ from fastapi import WebSocket, WebSocketDisconnect
 from typing import Set, Dict, Any
 import json
 from datetime import datetime
-from app.services.mqtt_service import mqtt_service
+import asyncio
+from services.mqtt_service import mqtt_service
 
 
 class WebSocketManager:
     def __init__(self):
         self.clients: Set[WebSocket] = set()
+        self._loop: asyncio.AbstractEventLoop | None = None
 
     async def connect(self, websocket: WebSocket):
         """Accept new WebSocket connection"""
@@ -67,15 +69,21 @@ class WebSocketManager:
 
     def initialize(self):
         """Initialize WebSocket manager and MQTT forwarding"""
+        self._loop = asyncio.get_running_loop()
+
         # Forward MQTT messages to all WebSocket clients
         def mqtt_to_ws(topic: str, payload: Dict[str, Any]):
-            import asyncio
-            asyncio.create_task(self.broadcast({
-                "type": "sensor_data",
-                "topic": topic,
-                "data": payload,
-                "timestamp": datetime.now().isoformat()
-            }))
+            if not self._loop:
+                return
+            self._loop.call_soon_threadsafe(
+                asyncio.create_task,
+                self.broadcast({
+                    "type": "sensor_data",
+                    "topic": topic,
+                    "data": payload,
+                    "timestamp": datetime.now().isoformat()
+                })
+            )
 
         mqtt_service.on_message(mqtt_to_ws)
         print("✓ WebSocket manager initialized")

@@ -1,24 +1,18 @@
-# app/__init__.py
-"""EcoGuard 360 IoT Backend API"""
+FROM python:3.10-slim
 
-# app/config/__init__.py
-"""Configuration module"""
-from .env import settings
+WORKDIR /app
 
-__all__ = ["settings"]
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# app/routes/__init__.py
-"""API routes module"""
+COPY /src/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# app/services/__init__.py
-"""Services module"""
-from .mqtt_service import mqtt_service
-from .influx_service import influx_service
+COPY src/ /app/src/
 
-__all__ = ["mqtt_service", "influx_service"]
+WORKDIR /app/src
 
-# app/websocket/__init__.py
-"""WebSocket module"""
-from .ws import ws_manager
+EXPOSE ${PORT}
 
-__all__ = ["ws_manager"]
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT}"]

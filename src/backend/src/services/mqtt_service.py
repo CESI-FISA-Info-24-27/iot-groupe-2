@@ -1,7 +1,7 @@
 import paho.mqtt.client as mqtt
 import json
 from typing import Callable, List, Dict, Any, Optional
-from app.config.env import settings
+from config.env import settings
 
 
 class Subscription:
@@ -83,7 +83,7 @@ class MQTTService:
                 except Exception as e:
                     print(f"Error in MQTT subscription handler: {e}")
 
-    def _on_disconnect(self, client, userdata, flags, reason_code, properties):
+    def _on_disconnect(self, client, userdata, reason_code, properties=None, *_args):
         """Callback when disconnected from MQTT broker"""
         self.connected = False
         print(f"MQTT client disconnected (code: {reason_code})")

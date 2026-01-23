@@ -4,11 +4,11 @@ from contextlib import asynccontextmanager
 import json
 from typing import Dict, Any
 
-from app.config.env import settings
-from app.services.mqtt_service import mqtt_service
-from app.services.influx_service import influx_service
-from app.routes.sensors import router as sensors_router
-from app.websocket.ws import ws_manager
+from config.env import settings
+from services.mqtt_service import mqtt_service
+from services.influx_service import influx_service
+from routes.sensors import router as sensors_router
+from websocket.ws import ws_manager
 
 
 @asynccontextmanager
@@ -142,7 +142,7 @@ app.include_router(sensors_router)
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
-        "app.main:app",
+        "main:app",
         host="0.0.0.0",
         port=settings.port,
         reload=settings.env == "development"

@@ -1,15 +1,15 @@
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
-from app.services.influx_service import influx_service
-from app.services.mqtt_service import mqtt_service
+from services.influx_service import influx_service
+from services.mqtt_service import mqtt_service
 
 router = APIRouter(prefix="/api/sensors", tags=["sensors"])
 
 
 class ActionRequest(BaseModel):
     target: str
-    payload: Optional[Dict[str, Any]] = {}
+    payload: Optional[Dict[str, Any]] = None
 
 
 class HistoryResponse(BaseModel):

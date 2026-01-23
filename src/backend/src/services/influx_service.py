@@ -3,7 +3,7 @@ from influxdb_client.client.write_api import SYNCHRONOUS
 from typing import List, Dict, Optional, Any
 import asyncio
 from datetime import datetime
-from app.config.env import settings
+from config.env import settings
 
 
 class InfluxService:
