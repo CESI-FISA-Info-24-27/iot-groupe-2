@@ -1,0 +1,110 @@
+services:
+  api: # Backend Express
+    build: ./backend
+    container_name: api
+    environment:
+      - PORT=${BACKEND_ORIGIN_PORT?:BACKEND_ORIGIN_PORT manquant}
+      - MQTT_HOST=mqtt-broker
+      - MQTT_PORT=${MQTT_BROKER_DEST_PORT?:MQTT_BROKER_DEST_PORT manquant}
+      - MQTT_USERNAME=${MQTT_BROKER_USERNAME?:MQTT_BROKER_USERNAME manquant}
+      - MQTT_PASSWORD=${MQTT_BROKER_PASSWORD?:MQTT_BROKER_PASSWORD manquant}
+      - INFLUX_URL=http://influxdb:${INFLUXDB_DEST_PORT?:INFLUXDB_DEST_PORT manquant}
+      - INFLUX_ORG=${INFLUXDB_INIT_ORG?:INFLUXDB_INIT_ORG manquant}
+      - INFLUX_BUCKET=${INFLUXDB_INIT_BUCKET?:INFLUXDB_INIT_BUCKET manquant}
+      - INFLUX_TOKEN=${INFLUXDB_INIT_ADMIN_TOKEN?:INFLUXDB_INIT_ADMIN_TOKEN manquant}
+    ports:
+      - "${BACKEND_ORIGIN_PORT?:BACKEND_ORIGIN_PORT manquant}:${BACKEND_DEST_PORT?:BACKEND_DEST_PORT manquant}"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    restart: unless-stopped
+    depends_on:
+      influxdb:
+        condition: service_healthy
+      mqtt-broker:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"const http=require('http'); const req=http.get({host:'127.0.0.1', port: process.env.PORT, path:'/health'}, res => {process.exit(res.statusCode===200?0:1)}).on('error', ()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  mqtt-broker: # Serveur MQTT recevant les données du bridge
+    build: ./mqtt-broker
+    container_name: mqtt-broker
+    ports:
+      - "${MQTT_BROKER_ORIGIN_PORT?:MQTT_BROKER_ORIGIN_PORT manquant}:${MQTT_BROKER_DEST_PORT?:MQTT_BROKER_DEST_PORT manquant}"
+    volumes:
+      - ./mqtt-broker/config:/mosquitto/config
+      - ./mqtt-broker/data:/mosquitto/data
+      - ./mqtt-broker/log:/mosquitto/log
+    restart: unless-stopped
+    environment:
+      - MOSQUITTO_USERNAME=${MQTT_BROKER_USERNAME?:MQTT_BROKER_USERNAME manquant}
+      - MOSQUITTO_PASSWORD=${MQTT_BROKER_PASSWORD?:MQTT_BROKER_PASSWORD manquant}
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -h localhost -u ${MQTT_BROKER_USERNAME} -P ${MQTT_BROKER_PASSWORD} -t '$$SYS/broker/uptime' -C 1 -W 2 || exit 1"]
+      interval: 10s
+      timeout: 7s
+      retries: 5
+
+
+  gateway: # Bridge BLE-MQTT
+    build: ./gateway
+    container_name: gateway
+    privileged: true
+    volumes:
+      - /var/run/dbus:/var/run/dbus
+      - ./gateway/config:/app/config
+    environment:
+      - PYTHONUNBUFFERED=1
+      - CONFIG_FILE=${BRIDGE_BLE_MQTT_CONFIG_FILE?:BRIDGE_BLE_MQTT_CONFIG_FILE manquant}
+      - MQTT_BROKER_HOST=localhost
+      - MQTT_BROKER_PORT=${MQTT_BROKER_DEST_PORT?:MQTT_BROKER_DEST_PORT manquant}
+    restart: unless-stopped
+    network_mode: "host"
+    depends_on:
+      mqtt-broker:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import socket,os,sys; s=socket.socket(); s.settimeout(2); h=os.environ.get('MQTT_BROKER_HOST','localhost'); p=int(os.environ.get('MQTT_BROKER_PORT','1883')); s.connect((h,p)); s.close()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  influxdb: # Base de données
+    image: influxdb:2.7
+    container_name: influxdb
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=${INFLUXDB_INIT_MODE?:INFLUXDB_INIT_MODE manquant}
+      - DOCKER_INFLUXDB_INIT_USERNAME=${INFLUXDB_INIT_USERNAME?:INFLUXDB_INIT_USERNAME manquant}
+      - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUXDB_INIT_PASSWORD?:INFLUXDB_INIT_PASSWORD manquant}
+      - DOCKER_INFLUXDB_INIT_ORG=${INFLUXDB_INIT_ORG?:INFLUXDB_INIT_ORG manquant}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUXDB_INIT_BUCKET?:INFLUXDB_INIT_BUCKET manquant}
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUXDB_INIT_ADMIN_TOKEN?:INFLUXDB_INIT_ADMIN_TOKEN manquant}
+    ports:
+      - "${INFLUXDB_ORIGIN_PORT?:INFLUXDB_ORIGIN_PORT manquant}:${INFLUXDB_DEST_PORT?:INFLUXDB_DEST_PORT manquant}"
+    volumes:
+      - ./databases/influxdb:/var/lib/influxdb2
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS --max-time 15 http://localhost:${INFLUXDB_DEST_PORT?:INFLUXDB_DEST_PORT manquant}/health | grep '\"status\":\"pass\"' || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 50
+
+  mobile_app: # Application Mobile React Native
+    build: ./mobile_app
+    container_name: mobile_app
+    volumes:
+      - ./mobile_app:/app
+      - /app/node_modules
+    environment:
+      - REACT_NATIVE_PACKAGER_HOSTNAME=localhost
+      - BACKEND_URL=http://api:${BACKEND_DEST_PORT}
+    ports:
+      - "${MOBILE_APP_ORIGIN_PORT?:MOBILE_APP_ORIGIN_PORT manquant}:${MOBILE_APP_DEST_PORT?:MOBILE_APP_DEST_PORT manquant}"
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy

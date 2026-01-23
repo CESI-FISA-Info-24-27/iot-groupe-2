@@ -1,3 +1,4 @@
 bleak
 paho-mqtt
 python-dotenv
+pyyaml
