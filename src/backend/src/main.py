@@ -8,6 +8,7 @@ from config.env import settings
 from services.mqtt_service import mqtt_service
 from services.influx_service import influx_service
 from routes.sensors import router as sensors_router
+from routes.camera import router as camera_router
 from websocket.ws import ws_manager
 
 
@@ -137,6 +138,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
 # Include routers
 app.include_router(sensors_router)
+app.include_router(camera_router)
 
 
 if __name__ == "__main__":
