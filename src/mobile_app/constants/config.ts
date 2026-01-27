@@ -13,6 +13,7 @@ export const API_ENDPOINTS = {
   cameraSnapshot: `${API_BASE_URL}/api/camera/snapshot`,
   cameraStream: `${API_BASE_URL}/api/camera/stream`,
   camera: `http://honjin1.miemasu.net/nphMotionJpeg?Resolution=640x480&Quality=Standard`, // Pour tester le flux caméra
+  cameraSnapshot: `${API_BASE_URL}/api/camera/snapshot`,
 };
 
 // Configuration de chaque capteur
