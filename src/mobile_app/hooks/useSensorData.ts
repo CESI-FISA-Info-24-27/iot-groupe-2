@@ -14,36 +14,55 @@ export const useSensorData = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchSensorValue = async (sensor: SensorType): Promise<number | null> => {
+  const fetchLatestValues = async (): Promise<Record<SensorType, number | null>> => {
     try {
-      const response = await fetch(API_ENDPOINTS[sensor]);
+      const url = `${API_ENDPOINTS.sensorsHistory}?range=24h`;
+      const response = await fetch(url);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const result = await response.json();
-      // Adapter selon le format de votre API
-      return result.value || result[sensor] || null;
+      const rows = Array.isArray(result?.data) ? result.data : [];
+
+      const latest: Record<SensorType, number | null> = {
+        temperature: null,
+        pressure: null,
+        distance: null,
+        sound: null,
+      };
+
+      for (const row of rows) {
+        const metric = row?.metric ?? row?.measurement ?? row?.field;
+        if (metric in latest && row?.value !== undefined) {
+          const value = Number(row.value);
+          if (!Number.isNaN(value)) {
+            latest[metric as SensorType] = value;
+          }
+        }
+      }
+
+      return latest;
     } catch (err) {
-      console.error(`Error fetching ${sensor}:`, err);
-      return null;
+      console.error('Error fetching sensor history:', err);
+      return {
+        temperature: null,
+        pressure: null,
+        distance: null,
+        sound: null,
+      };
     }
   };
 
   const fetchAllSensors = useCallback(async () => {
     try {
       setLoading(true);
-      const [temperature, pressure, distance, sound] = await Promise.all([
-        fetchSensorValue('temperature'),
-        fetchSensorValue('pressure'),
-        fetchSensorValue('distance'),
-        fetchSensorValue('sound'),
-      ]);
+      const latest = await fetchLatestValues();
 
       setData({
-        temperature,
-        pressure,
-        distance,
-        sound,
+        temperature: latest.temperature,
+        pressure: latest.pressure,
+        distance: latest.distance,
+        sound: latest.sound,
         timestamp: Date.now(),
       });
       setError(null);

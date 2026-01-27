@@ -7,7 +7,7 @@ import { API_ENDPOINTS } from '@/constants/config';
 export const CameraStream: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [key, setKey] = useState(0); // Pour forcer le rechargement
+  const [key, setKey] = useState(0);
 
   const handleLoad = () => {
     setLoading(false);
@@ -17,7 +17,6 @@ export const CameraStream: React.FC = () => {
   const handleError = () => {
     setLoading(false);
     setError(true);
-    // Réessayer après 5 secondes
     setTimeout(() => {
       setKey(prev => prev + 1);
       setLoading(true);
