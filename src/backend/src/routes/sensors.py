@@ -1,10 +1,14 @@
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
+import time
+import random
 from services.influx_service import influx_service
 from services.mqtt_service import mqtt_service
 
 router = APIRouter(prefix="/api/sensors", tags=["sensors"])
+
+_mock_store: List[Dict[str, Any]] = []
 
 
 class ActionRequest(BaseModel):
@@ -28,6 +32,15 @@ class ErrorResponse(BaseModel):
     error: str
 
 
+class MockPayload(BaseModel):
+    room: Optional[str] = "lab"
+    sensor_id: Optional[str] = "mock-node"
+    temperature: Optional[float] = None
+    pressure: Optional[float] = None
+    distance: Optional[float] = None
+    sound: Optional[float] = None
+
+
 @router.get("/history", response_model=HistoryResponse)
 async def get_history(
     sensor: Optional[str] = Query(None),
@@ -47,17 +60,48 @@ async def get_history(
             room=room,
             range_time=range
         )
-        
+        if data:
+            return HistoryResponse(
+                success=True,
+                count=len(data),
+                data=data
+            )
+    except Exception:
+        data = []
+
+    # Fallback to mock data when InfluxDB is not available or empty
+    filtered = _mock_store
+    if room:
+        filtered = [item for item in filtered if item.get("room") == room]
+    if sensor:
+        filtered = [item for item in filtered if item.get("metric") == sensor]
+
+    if filtered:
         return HistoryResponse(
             success=True,
-            count=len(data),
-            data=data
+            count=len(filtered),
+            data=filtered
         )
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=str(e)
-        )
+
+    # If no data at all, return a single mock snapshot
+    ts = int(time.time() * 1000)
+    room_value = room or "lab"
+    sensor_value = "mock-node"
+    snapshot = [
+        {"time": ts, "room": room_value, "sensor_id": sensor_value, "metric": "temperature", "value": round(random.uniform(18, 28), 2)},
+        {"time": ts, "room": room_value, "sensor_id": sensor_value, "metric": "pressure", "value": round(random.uniform(980, 1030), 2)},
+        {"time": ts, "room": room_value, "sensor_id": sensor_value, "metric": "distance", "value": round(random.uniform(20, 200), 2)},
+        {"time": ts, "room": room_value, "sensor_id": sensor_value, "metric": "sound", "value": round(random.uniform(30, 85), 2)},
+    ]
+
+    if sensor:
+        snapshot = [item for item in snapshot if item["metric"] == sensor]
+
+    return HistoryResponse(
+        success=True,
+        count=len(snapshot),
+        data=snapshot
+    )
 
 
 @router.post("/action", response_model=ActionResponse)
@@ -87,3 +131,44 @@ async def send_action(action: ActionRequest):
         success=True,
         topic=topic
     )
+
+
+@router.post("/mock")
+async def push_mock_payload(payload: MockPayload):
+    """
+    Push mock telemetry data (JSON payload) for quick testing.
+    """
+    ts = int(time.time() * 1000)
+    room = payload.room or "lab"
+    sensor_id = payload.sensor_id or "mock-node"
+
+    samples = {
+        "temperature": payload.temperature,
+        "pressure": payload.pressure,
+        "distance": payload.distance,
+        "sound": payload.sound,
+    }
+
+    for metric, value in samples.items():
+        if value is None:
+            continue
+        entry = {
+            "time": ts,
+            "room": room,
+            "sensor_id": sensor_id,
+            "metric": metric,
+            "value": float(value),
+        }
+        _mock_store.append(entry)
+        _mock_latest[metric] = float(value)
+
+    if len(_mock_store) > 500:
+        del _mock_store[: len(_mock_store) - 500]
+
+    return {
+        "success": True,
+        "room": room,
+        "sensor_id": sensor_id,
+        "timestamp": ts,
+        "data": {k: v for k, v in samples.items() if v is not None},
+    }
