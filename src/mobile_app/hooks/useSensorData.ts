@@ -1,5 +1,5 @@
 // hooks/useSensorData.ts
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { SensorData, SensorType } from '@/types/sensors';
 import { API_ENDPOINTS, REFRESH_INTERVAL } from '@/constants/config';
 
@@ -13,6 +13,7 @@ export const useSensorData = () => {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const hasLoadedRef = useRef(false);
 
   const fetchLatestValues = async (): Promise<Record<SensorType, number | null>> => {
     try {
@@ -53,31 +54,44 @@ export const useSensorData = () => {
     }
   };
 
-  const fetchAllSensors = useCallback(async () => {
+  const fetchAllSensors = useCallback(async (showLoading = false) => {
     try {
-      setLoading(true);
+      if (showLoading) {
+        setLoading(true);
+      }
       const latest = await fetchLatestValues();
 
-      setData({
-        temperature: latest.temperature,
-        pressure: latest.pressure,
-        distance: latest.distance,
-        sound: latest.sound,
-        timestamp: Date.now(),
+      setData(prev => {
+        const next = {
+          temperature: latest.temperature,
+          pressure: latest.pressure,
+          distance: latest.distance,
+          sound: latest.sound,
+          timestamp: Date.now(),
+        };
+        const same =
+          prev.temperature === next.temperature &&
+          prev.pressure === next.pressure &&
+          prev.distance === next.distance &&
+          prev.sound === next.sound;
+        return same ? prev : next;
       });
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Une erreur est survenue');
     } finally {
-      setLoading(false);
+      if (showLoading || !hasLoadedRef.current) {
+        setLoading(false);
+        hasLoadedRef.current = true;
+      }
     }
   }, []);
 
   useEffect(() => {
-    fetchAllSensors();
+    fetchAllSensors(true);
     const interval = setInterval(fetchAllSensors, REFRESH_INTERVAL);
     return () => clearInterval(interval);
   }, [fetchAllSensors]);
 
-  return { data, loading, error, refresh: fetchAllSensors };
+  return { data, loading, error, refresh: () => fetchAllSensors(true) };
 };
