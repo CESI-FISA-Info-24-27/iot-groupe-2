@@ -7,8 +7,9 @@ export const API_BASE_URL = "http://10.41.12.112:3000";
 export const API_ENDPOINTS = {
   sensorsHistory: `${API_BASE_URL}/api/sensors/history`,
   health: `${API_BASE_URL}/health`,
-  camera: `http://honjin1.miemasu.net/nphMotionJpeg?Resolution=640x480&Quality=Standard`, // Pour tester le flux caméra
   cameraSnapshot: `${API_BASE_URL}/api/camera/snapshot`,
+  cameraStream: `${API_BASE_URL}/api/camera/stream`,
+  camera: `http://honjin1.miemasu.net/nphMotionJpeg?Resolution=640x480&Quality=Standard`, // Pour tester le flux caméra
 };
 
 // Configuration de chaque capteur
