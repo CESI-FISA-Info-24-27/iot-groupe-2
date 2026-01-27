@@ -17,6 +17,8 @@ type CameraSnapshotProps = {
 };
 
 const MIN_FPS = 0.5;
+const MIN_INTERVAL_MS = 200;
+const STATUS_INTERVAL_MS = 2000;
 const ERROR_THRESHOLD = 3;
 const SUCCESS_THRESHOLD = 5;
 
@@ -32,7 +34,7 @@ const appendCacheBuster = (url: string, ts: number) => {
 
 export const CameraSnapshot: React.FC<CameraSnapshotProps> = ({
   baseUrl,
-  fps = 2,
+  fps = 4,
   paused = false,
   adaptive = true,
   style,
@@ -43,8 +45,11 @@ export const CameraSnapshot: React.FC<CameraSnapshotProps> = ({
   const [consecutiveErrors, setConsecutiveErrors] = useState(0);
   const [consecutiveSuccesses, setConsecutiveSuccesses] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const statusTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const statusInFlightRef = useRef(false);
   const backedOffRef = useRef(false);
+  const refreshInFlightRef = useRef(false);
+  const lastOkUrlRef = useRef<string | null>(null);
 
   const updateStatus = useCallback(
     (next: StatusPayload) => {
@@ -127,17 +132,20 @@ export const CameraSnapshot: React.FC<CameraSnapshotProps> = ({
   );
 
   const refreshImage = useCallback(() => {
+    if (refreshInFlightRef.current) return;
+    refreshInFlightRef.current = true;
+
     const url = appendCacheBuster(baseUrl, Date.now());
     setImageUrl(url);
-    void checkStatus(url);
-  }, [baseUrl, checkStatus]);
+    refreshInFlightRef.current = false;
+  }, [baseUrl]);
 
   useEffect(() => {
     if (paused) return;
 
     refreshImage();
 
-    const intervalMs = Math.max(1000 / effectiveFps, 200);
+    const intervalMs = Math.max(1000 / effectiveFps, MIN_INTERVAL_MS);
     timerRef.current = setInterval(refreshImage, intervalMs);
 
     return () => {
@@ -148,6 +156,25 @@ export const CameraSnapshot: React.FC<CameraSnapshotProps> = ({
     };
   }, [effectiveFps, paused, refreshImage]);
 
+  useEffect(() => {
+    if (paused) return;
+
+    const runStatus = () => {
+      const targetUrl = lastOkUrlRef.current ?? appendCacheBuster(baseUrl, Date.now());
+      void checkStatus(targetUrl);
+    };
+
+    runStatus();
+    statusTimerRef.current = setInterval(runStatus, STATUS_INTERVAL_MS);
+
+    return () => {
+      if (statusTimerRef.current) {
+        clearInterval(statusTimerRef.current);
+        statusTimerRef.current = null;
+      }
+    };
+  }, [baseUrl, checkStatus, paused]);
+
   const showWeakSignal = consecutiveErrors > ERROR_THRESHOLD;
 
   return (
@@ -156,7 +183,16 @@ export const CameraSnapshot: React.FC<CameraSnapshotProps> = ({
         source={{ uri: imageUrl }}
         style={styles.image}
         resizeMode="contain"
-        onError={markError}
+        onLoad={() => {
+          lastOkUrlRef.current = imageUrl;
+          markSuccess();
+        }}
+        onError={() => {
+          markError();
+          if (lastOkUrlRef.current) {
+            setImageUrl(lastOkUrlRef.current);
+          }
+        }}
       />
 
       {showWeakSignal && (

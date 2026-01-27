@@ -43,7 +43,7 @@ export default function CameraScreen() {
       <View style={styles.streamContainer}>
         <CameraSnapshot
           baseUrl={API_ENDPOINTS.cameraSnapshot}
-          fps={2}
+          fps={4}
           paused={paused}
           adaptive
           onStatusChange={setStatus}
