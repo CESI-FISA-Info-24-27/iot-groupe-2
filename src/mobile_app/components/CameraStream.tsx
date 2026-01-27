@@ -41,9 +41,9 @@ export const CameraStream: React.FC = () => {
         </View>
       )}
 
-      <Image
+  <Image
         key={key}
-        source={{ uri: API_ENDPOINTS.camera }}
+        source={{ uri: API_ENDPOINTS.cameraStream }}
         style={styles.stream}
         contentFit="contain"
         onLoad={handleLoad}

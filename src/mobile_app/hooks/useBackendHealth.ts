@@ -1,5 +1,5 @@
 // hooks/useBackendHealth.ts
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { API_ENDPOINTS, REFRESH_INTERVAL } from '@/constants/config';
 
 type HealthResponse = {
@@ -15,30 +15,36 @@ export const useBackendHealth = () => {
   const [data, setData] = useState<HealthResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const hasLoadedRef = useRef(false);
 
-  const fetchHealth = useCallback(async () => {
+  const fetchHealth = useCallback(async (showLoading = false) => {
     try {
-      setLoading(true);
+      if (showLoading) {
+        setLoading(true);
+      }
       const response = await fetch(API_ENDPOINTS.health);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const result = (await response.json()) as HealthResponse;
-      setData(result);
+      setData(prev => (JSON.stringify(prev) === JSON.stringify(result) ? prev : result));
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Une erreur est survenue');
       setData(null);
     } finally {
-      setLoading(false);
+      if (showLoading || !hasLoadedRef.current) {
+        setLoading(false);
+        hasLoadedRef.current = true;
+      }
     }
   }, []);
 
   useEffect(() => {
-    fetchHealth();
+    fetchHealth(true);
     const interval = setInterval(fetchHealth, REFRESH_INTERVAL);
     return () => clearInterval(interval);
   }, [fetchHealth]);
 
-  return { data, loading, error, refresh: fetchHealth };
+  return { data, loading, error, refresh: () => fetchHealth(true) };
 };
