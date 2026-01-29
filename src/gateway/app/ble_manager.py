@@ -66,6 +66,7 @@ class BLEManager:
             return False, "ble_write_failed"
 
     async def _run_sensor(self, sensor: BleSensorConfig) -> None:
+        print(f"[BLE] Démarrage du capteur {sensor.sensor_id} ({sensor.metric})")
         if sensor.simulated:
             await self._run_simulated_sensor(sensor)
             return
@@ -76,18 +77,22 @@ class BLEManager:
             offline_published = False
 
             def _on_disconnect(_client) -> None:
+                print(f"[BLE] Déconnexion du capteur {sensor.sensor_id}")
                 disconnect_event.set()
 
             try:
                 device = await self._find_device(sensor)
                 if not device:
+                    print(f"[BLE] Capteur {sensor.sensor_id} non trouvé, nouvel essai dans {self._config.scan_interval}s")
                     await asyncio.sleep(self._config.scan_interval)
                     continue
 
+                print(f"[BLE] Connexion au capteur {sensor.sensor_id} ({device})...")
                 client = BleakClient(device, disconnected_callback=_on_disconnect)
                 await client.connect()
                 self._clients[sensor.sensor_id] = client
                 connected = True
+                print(f"[BLE] Capteur {sensor.sensor_id} connecté !")
                 self._publish_status(sensor, "ONLINE")
 
                 if sensor.mode == "notify" and sensor.telemetry_uuid:
@@ -103,6 +108,7 @@ class BLEManager:
             except asyncio.CancelledError:
                 break
             except Exception as exc:
+                print(f"[BLE][ERREUR] Capteur {sensor.sensor_id} : {exc}")
                 self._publish_status(sensor, "OFFLINE", reason=str(exc))
                 offline_published = True
             finally:
