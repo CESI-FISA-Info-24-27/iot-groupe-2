@@ -57,12 +57,25 @@ services:
     privileged: true
     volumes:
       - /var/run/dbus:/var/run/dbus
+      - /dev/bus/usb:/dev/bus/usb
+      - /dev/serial:/dev/serial
+      - /dev:/dev
       - ./gateway/config:/app/config
     environment:
       - PYTHONUNBUFFERED=1
       - CONFIG_FILE=${BRIDGE_BLE_MQTT_CONFIG_FILE?:BRIDGE_BLE_MQTT_CONFIG_FILE manquant}
       - MQTT_BROKER_HOST=localhost
       - MQTT_BROKER_PORT=${MQTT_BROKER_DEST_PORT?:MQTT_BROKER_DEST_PORT manquant}
+      - MQTT_BROKER_USERNAME=${MQTT_BROKER_USERNAME?:MQTT_BROKER_USERNAME manquant}
+      - MQTT_BROKER_PASSWORD=${MQTT_BROKER_PASSWORD?:MQTT_BROKER_PASSWORD manquant}
+      - SERVICE_TEMPERATURE_UUID=${SERVICE_TEMPERATURE_UUID?:SERVICE_TEMPERATURE_UUID manquant}
+      - CHAR_TEMP_UUID=${CHAR_TEMP_UUID?:CHAR_TEMP_UUID manquant}
+      - SERVICE_PRESSURE_UUID=${SERVICE_PRESSURE_UUID?:SERVICE_PRESSURE_UUID manquant}
+      - CHAR_PRESSURE_UUID=${CHAR_PRESSURE_UUID?:CHAR_PRESSURE_UUID manquant}
+      - SERVICE_SOUND_UUID=${SERVICE_SOUND_UUID?:SERVICE_SOUND_UUID manquant}
+      - CHAR_SOUND_UUID=${CHAR_SOUND_UUID?:CHAR_SOUND_UUID manquant}
+      - SERVICE_DISTANCE_UUID=${SERVICE_DISTANCE_UUID?:SERVICE_DISTANCE_UUID manquant}
+      - CHAR_DISTANCE_UUID=${CHAR_DISTANCE_UUID?:CHAR_DISTANCE_UUID manquant}
     restart: unless-stopped
     network_mode: "host"
     depends_on:
