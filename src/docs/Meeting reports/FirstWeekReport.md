@@ -91,8 +91,8 @@ Le frontend est actuellement décorrélé du backend :
   - Gateway
   - Broker MQTT
   - Frontend (React Native)
-- CI en place :
 
+- CI en place :
   - vérification Lint du code Python
   - vérification Lint du code C++
   - vérification de la buildabilité du docker-compose (en cours car quelques bugs sont survenus).
