@@ -1,4 +1,4 @@
-name: CD CesIoT
+name: CD CesIoT Docker Images
 
 on:
   push:
