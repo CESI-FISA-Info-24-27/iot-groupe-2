@@ -1,15 +1,14 @@
 // constants/config.ts
 import { SensorConfig } from "@/types/sensors";
 
-// À remplacer par l'adresse IP du serveur IoT quand on l'aura
-export const API_BASE_URL = "http://10.41.12.112:3000";
+// Configure via Expo env: EXPO_PUBLIC_API_BASE_URL=https://xxxxx.trycloudflare.com
+export const API_BASE_URL =
+  process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://10.134.129.148:3000";
 
 export const API_ENDPOINTS = {
   sensorsHistory: `${API_BASE_URL}/api/sensors/history`,
   health: `${API_BASE_URL}/health`,
   cameraSnapshot: `${API_BASE_URL}/api/camera/snapshot`,
-  cameraStream: `${API_BASE_URL}/api/camera/stream`,
-  camera: `http://honjin1.miemasu.net/nphMotionJpeg?Resolution=640x480&Quality=Standard`, // Pour tester le flux caméra
 };
 
 // Configuration de chaque capteur

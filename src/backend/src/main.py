@@ -16,7 +16,7 @@ from websocket.ws import ws_manager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events"""
     # Startup
-    print("🚀 Starting EcoGuard 360 API...")
+    print("🚀 Starting CesIOT API...")
     
     # Initialize services
     influx_service.initialize()
@@ -68,7 +68,7 @@ async def lifespan(app: FastAPI):
 
     mqtt_service.subscribe("sensors/+/telemetry", handle_telemetry)
     
-    print(f"✓ EcoGuard API listening on port {settings.port}")
+    print(f"✓ CesIOT API listening on port {settings.port}")
     
     yield
     
@@ -79,7 +79,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="EcoGuard 360 API",
+    title="CesIOT API",
     description="IoT Backend API with MQTT and WebSocket support",
     version="1.0.0",
     lifespan=lifespan
@@ -98,7 +98,7 @@ app.add_middleware(
 @app.get("/")
 async def root():
     """Root endpoint"""
-    return {"message": "🚀 EcoGuard 360 API is running!"}
+    return {"message": "🚀 CesIOT API is running!"}
 
 
 @app.get("/health")

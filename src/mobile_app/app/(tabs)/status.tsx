@@ -10,10 +10,13 @@ import {
 } from 'react-native';
 import { API_ENDPOINTS } from '@/constants/config';
 import { useBackendHealth } from '@/hooks/useBackendHealth';
+import { useAppTheme } from '@/constants/theme';
 
 export default function StatusScreen() {
   const { data, loading, error, refresh } = useBackendHealth();
   const [refreshing, setRefreshing] = React.useState(false);
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -26,10 +29,10 @@ export default function StatusScreen() {
 
   const statusColor =
     status === 'healthy'
-      ? '#10b981'
+      ? theme.colors.success
       : status === 'degraded'
-        ? '#f59e0b'
-        : '#ef4444';
+        ? theme.colors.warning
+        : theme.colors.danger;
 
   return (
     <View style={styles.container}>
@@ -54,8 +57,8 @@ export default function StatusScreen() {
           <RefreshControl
             refreshing={refreshing || loading}
             onRefresh={onRefresh}
-            tintColor="#60a5fa"
-            colors={['#60a5fa']}
+            tintColor={theme.colors.accent}
+            colors={[theme.colors.accent]}
           />
         }
       >
@@ -75,10 +78,7 @@ export default function StatusScreen() {
         </View>
 
         <View style={styles.serviceGrid}>
-          <ServicePill
-            label="MQTT"
-            value={services.mqtt ?? 'unknown'}
-          />
+          <ServicePill label="MQTT" value={services.mqtt ?? 'unknown'} />
           <ServicePill
             label="InfluxDB"
             value={services.influxdb ?? 'unknown'}
@@ -107,9 +107,15 @@ function ServicePill({
   value: string;
   isLast?: boolean;
 }) {
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
   const normalized = value.toLowerCase();
   const color =
-    normalized === 'up' ? '#10b981' : normalized === 'down' ? '#ef4444' : '#64748b';
+    normalized === 'up'
+      ? theme.colors.success
+      : normalized === 'down'
+        ? theme.colors.danger
+        : theme.colors.textSubtle;
 
   return (
     <View
@@ -125,10 +131,11 @@ function ServicePill({
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: ReturnType<typeof useAppTheme>) =>
+  StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0b1220',
+    backgroundColor: theme.colors.background,
   },
   hero: {
     paddingTop: Platform.OS === 'ios' ? 64 : 40,
@@ -142,21 +149,21 @@ const styles = StyleSheet.create({
     right: -80,
     width: 220,
     height: 220,
-    backgroundColor: '#1d4ed8',
-    opacity: 0.25,
+    backgroundColor: theme.colors.accent,
+    opacity: theme.isDark ? 0.25 : 0.12,
     borderRadius: 999,
   },
   kicker: {
     fontSize: 12,
     letterSpacing: 1.5,
     textTransform: 'uppercase',
-    color: '#38bdf8',
+    color: theme.colors.accent,
     fontWeight: '700',
   },
   title: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#f8fafc',
+    color: theme.colors.text,
     marginTop: 6,
     fontFamily: Platform.select({
       ios: 'Avenir Next',
@@ -166,33 +173,33 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: theme.colors.textMuted,
     marginTop: 6,
   },
   content: {
     padding: 20,
   },
   errorBanner: {
-    backgroundColor: '#7f1d1d',
+    backgroundColor: theme.colors.dangerBg,
     padding: 12,
     marginHorizontal: 20,
     marginTop: 8,
     borderRadius: 10,
   },
   errorText: {
-    color: '#fecaca',
+    color: theme.isDark ? '#fecaca' : theme.colors.danger,
     fontSize: 13,
     textAlign: 'center',
   },
   statusCard: {
-    backgroundColor: '#111827',
+    backgroundColor: theme.colors.surfaceAlt,
     borderRadius: 18,
     padding: 18,
     borderWidth: 1,
     marginBottom: 16,
   },
   statusLabel: {
-    color: '#94a3b8',
+    color: theme.colors.textMuted,
     fontSize: 12,
     textTransform: 'uppercase',
     letterSpacing: 1.2,
@@ -208,7 +215,7 @@ const styles = StyleSheet.create({
     }),
   },
   statusHint: {
-    color: '#64748b',
+    color: theme.colors.textSubtle,
     fontSize: 12,
     marginTop: 6,
   },
@@ -219,11 +226,11 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#e2e8f0',
+    color: theme.colors.text,
   },
   sectionSubtitle: {
     fontSize: 12,
-    color: '#64748b',
+    color: theme.colors.textSubtle,
     marginTop: 2,
   },
   serviceGrid: {
@@ -232,7 +239,7 @@ const styles = StyleSheet.create({
   },
   servicePill: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: theme.colors.surface,
     borderRadius: 16,
     paddingVertical: 16,
     paddingHorizontal: 14,
@@ -243,7 +250,7 @@ const styles = StyleSheet.create({
     marginRight: 0,
   },
   serviceLabel: {
-    color: '#94a3b8',
+    color: theme.colors.textMuted,
     fontSize: 12,
     textTransform: 'uppercase',
     letterSpacing: 1,
@@ -254,21 +261,21 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   tipCard: {
-    backgroundColor: '#0f172a',
+    backgroundColor: theme.colors.surface,
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#1f2937',
+    borderColor: theme.colors.border,
   },
   tipTitle: {
-    color: '#e2e8f0',
+    color: theme.colors.text,
     fontSize: 14,
     fontWeight: '700',
   },
   tipText: {
-    color: '#94a3b8',
+    color: theme.colors.textMuted,
     fontSize: 12,
     marginTop: 6,
     lineHeight: 18,
   },
-});
+  });

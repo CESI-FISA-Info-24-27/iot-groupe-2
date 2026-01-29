@@ -4,6 +4,7 @@ import { AppState, StyleSheet, Text, View } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { CameraSnapshot } from "@/components/CameraSnapshot";
 import { API_ENDPOINTS } from "@/constants/config";
+import { useAppTheme } from "@/constants/theme";
 
 export default function CameraScreen() {
   const [paused, setPaused] = useState(false);
@@ -12,6 +13,8 @@ export default function CameraScreen() {
     lastHttpStatus?: number;
     xCache?: string;
   }>({ ok: true });
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
 
   useFocusEffect(
     useCallback(() => {
@@ -53,30 +56,31 @@ export default function CameraScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: ReturnType<typeof useAppTheme>) =>
+  StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#111827',
+    backgroundColor: theme.colors.background,
   },
   header: {
     padding: 20,
     paddingTop: 60,
-    backgroundColor: '#1f2937',
+    backgroundColor: theme.colors.surfaceAlt,
     borderBottomWidth: 1,
-    borderBottomColor: '#374151',
+    borderBottomColor: theme.colors.border,
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: theme.colors.text,
     marginBottom: 4,
   },
   subtitle: {
-    color: "#9ca3af",
+    color: theme.colors.textMuted,
     fontSize: 12,
   },
   statusText: {
-    color: "#e5e7eb",
+    color: theme.colors.text,
     fontSize: 12,
     marginTop: 6,
   },
@@ -85,6 +89,6 @@ const styles = StyleSheet.create({
     margin: 16,
     borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: '#000000',
+    backgroundColor: theme.colors.surface,
   },
-});
+  });
