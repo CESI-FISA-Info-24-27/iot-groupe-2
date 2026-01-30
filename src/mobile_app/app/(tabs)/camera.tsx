@@ -1,55 +1,31 @@
 // app/(tabs)/camera.tsx
-import React, { useCallback, useEffect, useState } from "react";
-import { AppState, StyleSheet, Text, View } from "react-native";
-import { useFocusEffect } from "@react-navigation/native";
-import { CameraSnapshot } from "@/components/CameraSnapshot";
+import React, { useState } from "react";
+import { StyleSheet, Text, View } from "react-native";
+import { CameraStream } from "@/components/CameraStream";
 import { API_ENDPOINTS } from "@/constants/config";
 import { useAppTheme } from "@/constants/theme";
 
 export default function CameraScreen() {
-  const [paused, setPaused] = useState(false);
-  const [status, setStatus] = useState<{
-    ok: boolean;
-    lastHttpStatus?: number;
-    xCache?: string;
-  }>({ ok: true });
+  const [streamError, setStreamError] = useState<string | null>(null);
   const theme = useAppTheme();
   const styles = getStyles(theme);
-
-  useFocusEffect(
-    useCallback(() => {
-      setPaused(false);
-      return () => setPaused(true);
-    }, [])
-  );
-
-  useEffect(() => {
-    const subscription = AppState.addEventListener("change", nextState => {
-      setPaused(nextState !== "active");
-    });
-
-    return () => subscription.remove();
-  }, []);
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Caméra en direct</Text>
-        <Text style={styles.subtitle}>{API_ENDPOINTS.cameraSnapshot}</Text>
-        <Text style={styles.statusText}>
-          Statut: {status.ok ? "OK" : "KO"}
-          {status.lastHttpStatus ? ` • HTTP ${status.lastHttpStatus}` : ""}
-          {status.xCache ? ` • X-Cache ${status.xCache}` : ""}
-        </Text>
+        <Text style={styles.subtitle}>{API_ENDPOINTS.cameraStream}</Text>
+        {streamError ? (
+          <Text style={styles.statusError}>{streamError}</Text>
+        ) : (
+          <Text style={styles.statusText}>Statut: OK</Text>
+        )}
       </View>
       
       <View style={styles.streamContainer}>
-        <CameraSnapshot
-          baseUrl={API_ENDPOINTS.cameraSnapshot}
-          fps={4}
-          paused={paused}
-          adaptive
-          onStatusChange={setStatus}
+        <CameraStream
+          streamUrl={API_ENDPOINTS.cameraStream}
+          onErrorChange={setStreamError}
         />
       </View>
     </View>
@@ -81,6 +57,11 @@ const getStyles = (theme: ReturnType<typeof useAppTheme>) =>
   },
   statusText: {
     color: theme.colors.text,
+    fontSize: 12,
+    marginTop: 6,
+  },
+  statusError: {
+    color: theme.colors.danger,
     fontSize: 12,
     marginTop: 6,
   },
