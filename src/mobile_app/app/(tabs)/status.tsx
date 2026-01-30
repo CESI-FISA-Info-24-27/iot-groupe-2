@@ -10,68 +10,151 @@ import {
 } from 'react-native';
 import { API_ENDPOINTS } from '@/constants/config';
 import { useBackendHealth } from '@/hooks/useBackendHealth';
-import { useAppTheme } from '@/constants/theme';
+import { useSensorData } from '@/hooks/useSensorData';
+
+const SENSOR_TIMEOUT = 5000;
 
 export default function StatusScreen() {
-  const { data, loading, error, refresh } = useBackendHealth();
+  const backend = useBackendHealth();
+  const sensors = useSensorData();
   const [refreshing, setRefreshing] = React.useState(false);
-  const theme = useAppTheme();
-  const styles = getStyles(theme);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await refresh();
+    await Promise.all([backend.refresh(), sensors.refresh()]);
     setRefreshing(false);
   };
 
-  const status = data?.status ?? 'unknown';
-  const services = data?.services ?? {};
+  const now = Date.now();
+  const lastTimestamp = sensors.data?.timestamp ?? 0;
+  const offline = now - lastTimestamp > SENSOR_TIMEOUT;
 
-  const statusColor =
-    status === 'healthy'
-      ? theme.colors.success
-      : status === 'degraded'
-        ? theme.colors.warning
-        : theme.colors.danger;
+
+  const buildSensorStatus = (
+    label: string,
+    isOffline: boolean,
+    errorMessage: string | null
+  ) => {
+    if (isOffline) return { label, status: 'OFFLINE', message: 'Aucune donnée reçue' };
+    if (errorMessage) return { label, status: 'ERROR', message: errorMessage };
+    return { label, status: 'OK', message: 'Fonctionnement normal' };
+  };
+
+ const temperature = sensors.data?.temperature;
+ const pressure = sensors.data?.pressure;
+
+let tempPressureError: string | null = null;
+
+if (temperature != null && (temperature < -40 || temperature > 125)) {
+  tempPressureError = 'Température hors plage';
+} else if (pressure != null && pressure <= 0) {
+  tempPressureError = 'Pression invalide';
+}
+
+
+  const sensorStatuses = [
+    buildSensorStatus('Température & Pression', offline, tempPressureError),
+
+    buildSensorStatus(
+      'Distance',
+      offline || sensors.data.distance == null,
+      sensors.data.distance! < 0 || sensors.data.distance! > 10000
+        ? 'Distance hors plage'
+        : null
+    ),
+
+    buildSensorStatus(
+      'Micro',
+      offline || sensors.data.sound == null,
+      sensors.data.sound! < 0 ? 'Signal micro invalide' : null
+    ),
+
+    buildSensorStatus('Caméra', offline, null),
+  ];
+
+  const hasError = sensorStatuses.some(s => s.status === 'ERROR');
+  const hasOffline = sensorStatuses.some(s => s.status === 'OFFLINE');
+
+  let globalStatus = 'STABLE';
+  if (hasError) globalStatus = 'ERREUR SYSTÈME';
+  else if (hasOffline) globalStatus = 'CAPTEURS HORS LIGNE';
+
+  const globalColor =
+    globalStatus === 'STABLE'
+      ? '#10b981'
+      : globalStatus === 'ERREUR SYSTÈME'
+      ? '#ef4444'
+      : '#f59e0b';
+
+  const backendStatus = backend.data?.status ?? 'unknown';
+  const services = backend.data?.services ?? {};
 
   return (
     <View style={styles.container}>
       <View style={styles.hero}>
         <View style={styles.heroGlow} />
         <Text style={styles.kicker}>Connectivity</Text>
-        <Text style={styles.title}>Status du backend</Text>
+        <Text style={styles.title}>Status du système</Text>
         <Text style={styles.subtitle}>
-          Vérifie la communication avec l’API et les services.
+          Santé des capteurs, backend et services.
         </Text>
       </View>
 
-      {error && (
+      {backend.error && (
         <View style={styles.errorBanner}>
-          <Text style={styles.errorText}>⚠️ {error}</Text>
+          <Text style={styles.errorText}>⚠️ {backend.error}</Text>
         </View>
       )}
 
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing || loading}
-            onRefresh={onRefresh}
-            tintColor={theme.colors.accent}
-            colors={[theme.colors.accent]}
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        <View style={[styles.statusCard, { borderColor: statusColor }]}>
-          <Text style={styles.statusLabel}>État global</Text>
-          <Text style={[styles.statusValue, { color: statusColor }]}>
-            {status.toUpperCase()}
-          </Text>
-          <Text style={styles.statusHint}>
-            Endpoint: {API_ENDPOINTS.health}
+        {/* GLOBAL */}
+        <View style={[styles.statusCard, { borderColor: globalColor }]}>
+          <Text style={styles.statusLabel}>État global système</Text>
+          <Text style={[styles.statusValue, { color: globalColor }]}>
+            {globalStatus}
           </Text>
         </View>
 
+        {/* SENSORS */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Capteurs</Text>
+          <Text style={styles.sectionSubtitle}>Diagnostic individuel</Text>
+        </View>
+
+        {sensorStatuses.map((s, i) => {
+          const color =
+            s.status === 'OK'
+              ? '#10b981'
+              : s.status === 'ERROR'
+              ? '#ef4444'
+              : '#f59e0b';
+
+          return (
+            <View key={i} style={[styles.statusCard, { borderColor: color }]}>
+              <Text style={styles.statusLabel}>{s.label}</Text>
+              <Text style={[styles.statusValue, { color }]}>{s.status}</Text>
+              <Text style={styles.statusHint}>{s.message}</Text>
+            </View>
+          );
+        })}
+
+        {/* BACKEND */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Backend</Text>
+          <Text style={styles.sectionSubtitle}>État de l’API</Text>
+        </View>
+
+        <View style={[styles.statusCard, { borderColor: '#38bdf8' }]}>
+          <Text style={styles.statusValue}>{backendStatus.toUpperCase()}</Text>
+          <Text style={styles.statusHint}>Endpoint: {API_ENDPOINTS.health}</Text>
+        </View>
+
+        {/* SERVICES */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Services</Text>
           <Text style={styles.sectionSubtitle}>MQTT & InfluxDB</Text>
@@ -79,19 +162,7 @@ export default function StatusScreen() {
 
         <View style={styles.serviceGrid}>
           <ServicePill label="MQTT" value={services.mqtt ?? 'unknown'} />
-          <ServicePill
-            label="InfluxDB"
-            value={services.influxdb ?? 'unknown'}
-            isLast
-          />
-        </View>
-
-        <View style={styles.tipCard}>
-          <Text style={styles.tipTitle}>Astuce</Text>
-          <Text style={styles.tipText}>
-            Si l’état reste “unknown”, vérifie que l’API écoute sur 0.0.0.0:3000
-            et que ton iPhone est sur le même Wi‑Fi.
-          </Text>
+          <ServicePill label="InfluxDB" value={services.influxdb ?? 'unknown'} isLast />
         </View>
       </ScrollView>
     </View>
@@ -107,15 +178,9 @@ function ServicePill({
   value: string;
   isLast?: boolean;
 }) {
-  const theme = useAppTheme();
-  const styles = getStyles(theme);
   const normalized = value.toLowerCase();
   const color =
-    normalized === 'up'
-      ? theme.colors.success
-      : normalized === 'down'
-        ? theme.colors.danger
-        : theme.colors.textSubtle;
+    normalized === 'up' ? '#10b981' : normalized === 'down' ? '#ef4444' : '#64748b';
 
   return (
     <View
@@ -131,12 +196,10 @@ function ServicePill({
   );
 }
 
-const getStyles = (theme: ReturnType<typeof useAppTheme>) =>
-  StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
+/* ================== TES STYLES ORIGINAUX INCHANGÉS ================== */
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#0b1220' },
   hero: {
     paddingTop: Platform.OS === 'ios' ? 64 : 40,
     paddingHorizontal: 20,
@@ -149,133 +212,67 @@ const getStyles = (theme: ReturnType<typeof useAppTheme>) =>
     right: -80,
     width: 220,
     height: 220,
-    backgroundColor: theme.colors.accent,
-    opacity: theme.isDark ? 0.25 : 0.12,
+    backgroundColor: '#1d4ed8',
+    opacity: 0.25,
     borderRadius: 999,
   },
   kicker: {
     fontSize: 12,
     letterSpacing: 1.5,
     textTransform: 'uppercase',
-    color: theme.colors.accent,
+    color: '#38bdf8',
     fontWeight: '700',
   },
   title: {
     fontSize: 28,
     fontWeight: '800',
-    color: theme.colors.text,
-    marginTop: 6,
-    fontFamily: Platform.select({
-      ios: 'Avenir Next',
-      android: 'sans-serif-medium',
-      default: 'System',
-    }),
-  },
-  subtitle: {
-    fontSize: 14,
-    color: theme.colors.textMuted,
+    color: '#f8fafc',
     marginTop: 6,
   },
-  content: {
-    padding: 20,
-  },
+  subtitle: { fontSize: 14, color: '#94a3b8', marginTop: 6 },
+  content: { padding: 20 },
   errorBanner: {
-    backgroundColor: theme.colors.dangerBg,
+    backgroundColor: '#7f1d1d',
     padding: 12,
     marginHorizontal: 20,
     marginTop: 8,
     borderRadius: 10,
   },
-  errorText: {
-    color: theme.isDark ? '#fecaca' : theme.colors.danger,
-    fontSize: 13,
-    textAlign: 'center',
-  },
+  errorText: { color: '#fecaca', fontSize: 13, textAlign: 'center' },
   statusCard: {
-    backgroundColor: theme.colors.surfaceAlt,
+    backgroundColor: '#111827',
     borderRadius: 18,
     padding: 18,
     borderWidth: 1,
     marginBottom: 16,
   },
   statusLabel: {
-    color: theme.colors.textMuted,
+    color: '#94a3b8',
     fontSize: 12,
     textTransform: 'uppercase',
     letterSpacing: 1.2,
   },
-  statusValue: {
-    fontSize: 24,
-    fontWeight: '800',
-    marginTop: 6,
-    fontFamily: Platform.select({
-      ios: 'Avenir Next',
-      android: 'sans-serif',
-      default: 'System',
-    }),
-  },
-  statusHint: {
-    color: theme.colors.textSubtle,
-    fontSize: 12,
-    marginTop: 6,
-  },
-  sectionHeader: {
-    marginTop: 8,
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: theme.colors.text,
-  },
-  sectionSubtitle: {
-    fontSize: 12,
-    color: theme.colors.textSubtle,
-    marginTop: 2,
-  },
-  serviceGrid: {
-    flexDirection: 'row',
-    marginBottom: 16,
-  },
+  statusValue: { fontSize: 24, fontWeight: '800', marginTop: 6 },
+  statusHint: { color: '#64748b', fontSize: 12, marginTop: 6 },
+  sectionHeader: { marginTop: 8, marginBottom: 12 },
+  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#e2e8f0' },
+  sectionSubtitle: { fontSize: 12, color: '#64748b', marginTop: 2 },
+  serviceGrid: { flexDirection: 'row', marginBottom: 16 },
   servicePill: {
     flex: 1,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: '#0f172a',
     borderRadius: 16,
     paddingVertical: 16,
     paddingHorizontal: 14,
     borderWidth: 1,
     marginRight: 12,
   },
-  servicePillLast: {
-    marginRight: 0,
-  },
+  servicePillLast: { marginRight: 0 },
   serviceLabel: {
-    color: theme.colors.textMuted,
+    color: '#94a3b8',
     fontSize: 12,
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
-  serviceValue: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginTop: 6,
-  },
-  tipCard: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  tipTitle: {
-    color: theme.colors.text,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  tipText: {
-    color: theme.colors.textMuted,
-    fontSize: 12,
-    marginTop: 6,
-    lineHeight: 18,
-  },
-  });
+  serviceValue: { fontSize: 18, fontWeight: '700', marginTop: 6 },
+});

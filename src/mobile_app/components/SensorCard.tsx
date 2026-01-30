@@ -59,7 +59,6 @@ export const SensorCard: React.FC<SensorCardProps> = ({ config, value, timestamp
           </View>
         </View>
       </View>
-
       <View style={styles.valueContainer}>
         {value === null ? (
           <Text style={styles.offline}>Hors ligne</Text>
