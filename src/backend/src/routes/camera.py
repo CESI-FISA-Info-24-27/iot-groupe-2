@@ -9,7 +9,8 @@ from urllib.error import URLError, HTTPError
 router = APIRouter(prefix="/api/camera", tags=["camera"])
 logger = logging.getLogger("camera")
 
-DEFAULT_SNAPSHOT_URL = "http://172.20.10.3/stream"
+DEFAULT_SNAPSHOT_URL = "http://172.20.10.3/snapshot"
+DEFAULT_STREAM_URL = "http://172.20.10.3/stream"
 _cache_lock = Lock()
 _last_frame = None
 _last_ts = 0.0
@@ -78,7 +79,7 @@ def _iter_mjpeg_stream(response, chunk_size: int = 4096):
 
 
 @router.get("/stream")
-def stream(url: str = Query(DEFAULT_SNAPSHOT_URL)):
+def stream(url: str = Query(DEFAULT_STREAM_URL)):
     logger.info("stream requested url=%s", url)
     headers = {
         "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",

@@ -9,7 +9,7 @@ export const API_ENDPOINTS = {
   health: `${API_BASE_URL}/health`,
   cameraSnapshot: `${API_BASE_URL}/api/camera/snapshot`,
   cameraStream: `${API_BASE_URL}/api/camera/stream`,
-  camera: `http://172.20.10.2/`, // Snapshot caméra Raspberry Pi
+  camera: `http://172.20.10.3/snapshot`, // Snapshot caméra
 };
 
 // Configuration de chaque capteur
