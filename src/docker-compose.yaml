@@ -55,9 +55,10 @@ services:
     build: ./gateway
     container_name: gateway
     privileged: true
+    devices:
+      - /dev/hci0:/dev/hci0
     volumes:
       - /var/run/dbus:/var/run/dbus
-      - /dev/bus/usb:/dev/bus/usb
       - ./gateway/config:/app/config
     environment:
       - PYTHONUNBUFFERED=1
