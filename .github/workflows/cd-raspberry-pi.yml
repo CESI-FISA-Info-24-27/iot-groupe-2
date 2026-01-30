@@ -50,8 +50,6 @@ jobs:
           host: ${{ secrets.PI_HOST }}
           username: ${{ secrets.PI_USER }}
           key: ${{ secrets.PI_SSH_KEY }}
-          timeout: 5m
-          command_timeout: 3m
           debug: true
           script: |
             set -e
