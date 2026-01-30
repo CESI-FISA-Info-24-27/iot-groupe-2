@@ -1,10 +1,50 @@
+
 ble:
   scan_interval: 5
-  device_name: "BLE Device Name"
-  characteristic_uuid: "12345678-1234-5678-1234-56789abcdef0"
+  sensors:
+    - sensor_id: "ble-temp"
+      room: "C4"
+      name: "ESP32_Capteurs"
+      address: null
+      telemetry_uuid: "12345678-0001-1000-8000-1234567890ab"  # Température
+      command_uuid: null
+      mode: "notify"
+      read_interval: 2.0
+      metric: "temperature"
+      simulated: false
+    - sensor_id: "ble-press"
+      room: "C4"
+      name: "ESP32_Capteurs"
+      address: null
+      telemetry_uuid: "12345678-0003-1000-8000-1234567890ab"  # Pression
+      command_uuid: null
+      mode: "notify"
+      read_interval: 2.0
+      metric: "pressure"
+      simulated: false
+    - sensor_id: "ble-son"
+      room: "C4"
+      name: "ESP32_Capteurs"
+      address: null
+      telemetry_uuid: "12345678-0005-1000-8000-1234567890ab"  # Son
+      command_uuid: null
+      mode: "notify"
+      read_interval: 2.0
+      metric: "sound"
+      simulated: false
+    - sensor_id: "ble-dist"
+      room: "C4"
+      name: "ESP32_Capteurs"
+      address: null
+      telemetry_uuid: "12345678-0007-1000-8000-1234567890ab"  # Distance
+      command_uuid: null
+      mode: "notify"
+      read_interval: 2.0
+      metric: "distance"
+      simulated: false
 
 mqtt:
   broker: "localhost"
   port: 1883
-  topic: "cesiot"
+  topic: "sensors"
   client_id: "ble-gateway"

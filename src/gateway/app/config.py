@@ -101,14 +101,79 @@ def _default_simulated_sensors() -> List[BleSensorConfig]:
     ]
 
 
+def _sensors_from_env() -> List[BleSensorConfig]:
+    # Construction explicite des capteurs à partir des variables d'environnement
+    sensors = []
+    # Température
+    temp_uuid = os.environ.get("CHAR_TEMP_UUID")
+    if temp_uuid:
+        sensors.append(BleSensorConfig(
+            sensor_id="ble-temp",
+            room="C4",
+            name="ESP32_Capteurs",
+            address=None,
+            telemetry_uuid=temp_uuid,
+            command_uuid=None,
+            mode="notify",
+            read_interval=2.0,
+            metric="temperature",
+            simulated=False,
+        ))
+    # Pression
+    press_uuid = os.environ.get("CHAR_PRESSURE_UUID")
+    if press_uuid:
+        sensors.append(BleSensorConfig(
+            sensor_id="ble-press",
+            room="C4",
+            name="ESP32_Capteurs",
+            address=None,
+            telemetry_uuid=press_uuid,
+            command_uuid=None,
+            mode="notify",
+            read_interval=2.0,
+            metric="pressure",
+            simulated=False,
+        ))
+    # Son
+    sound_uuid = os.environ.get("CHAR_SOUND_UUID")
+    if sound_uuid:
+        sensors.append(BleSensorConfig(
+            sensor_id="ble-son",
+            room="C4",
+            name="ESP32_Capteurs",
+            address=None,
+            telemetry_uuid=sound_uuid,
+            command_uuid=None,
+            mode="notify",
+            read_interval=2.0,
+            metric="sound",
+            simulated=False,
+        ))
+    # Distance
+    dist_uuid = os.environ.get("CHAR_DISTANCE_UUID")
+    if dist_uuid:
+        sensors.append(BleSensorConfig(
+            sensor_id="ble-dist",
+            room="C4",
+            name="ESP32_Capteurs",
+            address=None,
+            telemetry_uuid=dist_uuid,
+            command_uuid=None,
+            mode="notify",
+            read_interval=2.0,
+            metric="distance",
+            simulated=False,
+        ))
+    return sensors
+
 def load_config() -> AppConfig:
     load_dotenv()
 
     mqtt = MqttConfig(
-        host=os.environ.get("MQTT_HOST", "localhost"),
-        port=int(os.environ.get("MQTT_PORT", "1883")),
-        username=os.environ.get("MQTT_USERNAME") or None,
-        password=os.environ.get("MQTT_PASSWORD") or None,
+        host=os.environ.get("MQTT_BROKER_HOST", "localhost"),
+        port=int(os.environ.get("MQTT_BROKER_PORT", "1883")),
+        username=os.environ.get("MQTT_BROKER_USERNAME") or None,
+        password=os.environ.get("MQTT_BROKER_PASSWORD") or None,
         tls=_parse_bool(os.environ.get("MQTT_TLS"), default=False),
         tls_ca=os.environ.get("MQTT_TLS_CA") or None,
         tls_insecure=_parse_bool(os.environ.get("MQTT_TLS_INSECURE"), default=False),
@@ -117,9 +182,12 @@ def load_config() -> AppConfig:
     scan_interval = float(os.environ.get("BLE_SCAN_INTERVAL", "5"))
     reconnect_delay = float(os.environ.get("BLE_RECONNECT_DELAY", "5"))
 
-    sensors_raw = os.environ.get("BLE_SENSORS", "")
-    sensors = _parse_sensors(sensors_raw)
-
+    # Capteurs BLE depuis les variables d'environnement explicites
+    sensors = _sensors_from_env()
+    if not sensors:
+        # fallback : BLE_SENSORS (format compact)
+        sensors_raw = os.environ.get("BLE_SENSORS", "")
+        sensors = _parse_sensors(sensors_raw)
     if not sensors:
         sensors = _default_simulated_sensors()
 

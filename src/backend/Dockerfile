@@ -1,12 +1,16 @@
-FROM node:20-alpine
+FROM python:3.10-slim
 
-WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
-COPY package*.json ./
-RUN npm i
+COPY /src/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-COPY src ./src
+COPY src/ /app/src/
 
-EXPOSE ${BACKEND_ORIGIN_PORT}
+WORKDIR /app/src
 
-CMD ["npm", "run", "start"]
+EXPOSE ${PORT}
+
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT}"]

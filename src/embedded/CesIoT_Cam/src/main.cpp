@@ -1,5 +1,6 @@
 #include "esp_camera.h"
 #include <WiFi.h>
+#include <WiFiManager.h>
 
 // ===========================
 // CAMERA MODEL
@@ -7,11 +8,9 @@
 #define CAMERA_MODEL_AI_THINKER
 #include "camera_pins.h"
 
-// ===========================
-// WIFI
-// ===========================
-const char* ssid = "iPhone de coutinho (2)";
-const char* password = "87654321";
+#define CAMERA_IP       "10.75.92.253"
+#define CAMERA_GATEWAY  "10.75.92.23"
+#define CAMERA_SUBNET   "255.255.255.0"
 
 void startCameraServer();
 void setupLedFlash();
@@ -21,6 +20,9 @@ void setup() {
   Serial.setDebugOutput(false);
   Serial.println();
 
+  // ===========================
+  // CAMERA CONFIG
+  // ===========================
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
   config.ledc_timer = LEDC_TIMER_0;
@@ -53,33 +55,44 @@ void setup() {
     config.fb_count = 2;
     config.grab_mode = CAMERA_GRAB_LATEST;
   } else {
-    config.frame_size = FRAMESIZE_QVGA;
     config.fb_location = CAMERA_FB_IN_DRAM;
   }
 
-  // INIT CAMERA
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
-    Serial.printf("Camera init failed with error 0x%x\n", err);
+    Serial.printf("Camera init failed: 0x%x\n", err);
     return;
   }
 
-  // START WIFI
-  WiFi.begin(ssid, password);+
+  // ===========================
+  // WIFI MANAGER
+  // ===========================
+  WiFi.mode(WIFI_STA);
   WiFi.setSleep(false);
 
-  Serial.print("Connecting to WiFi");
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("\nWiFi connected");
+  WiFiManager wm;
+  wm.setConfigPortalTimeout(180);
 
+  Serial.println("Connexion WiFi...");
+  bool res = wm.autoConnect("ESP32-CAM-SETUP");
+
+  if (!res) 
+  {
+    Serial.println("Échec WiFi — redémarrage");
+    ESP.restart();
+  }
+
+  Serial.println("WiFi connecté !");
+  Serial.print("IP : ");
+  Serial.println(WiFi.localIP());
+
+  // ===========================
+  // START CAMERA SERVER
+  // ===========================
   startCameraServer();
 
-  Serial.print("Camera Ready! Use 'http://");
-  Serial.print(WiFi.localIP());
-  Serial.println("' to connect");
+  Serial.print("Camera Ready! http://");
+  Serial.println(WiFi.localIP());
 }
 
 void loop() {

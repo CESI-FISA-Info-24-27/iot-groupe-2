@@ -1,0 +1,95 @@
+name: CD CesIoT Raspberry Pi
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  deploy-on-raspberry:
+      runs-on: ubuntu-latest
+
+      steps:
+      - name: Check secrets
+        run: |
+          [ -z "${{ secrets.PI_HOST }}" ] && echo "ERROR: PI_HOST not set" && exit 1
+          [ -z "${{ secrets.PI_USER }}" ] && echo "ERROR: PI_USER not set" && exit 1
+          [ -z "${{ secrets.PI_SSH_KEY }}" ] && echo "ERROR: PI_SSH_KEY not set" && exit 1
+          echo "✓ All secrets are configured"
+
+      - name: Start Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.PI_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ secrets.PI_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Verify Tailscale connection
+        run: |
+          echo "Waiting for Tailscale to connect..."
+          sleep 5
+          echo "=== Tailscale Status ==="
+          tailscale status
+          echo ""
+          echo "=== Testing connectivity to Pi ==="
+          echo "Target IP: ${{ secrets.PI_HOST }}"
+          ping -c 3 ${{ secrets.PI_HOST }} && echo "✓ Ping successful" || (echo "✗ Ping failed - connection issue"; exit 1)
+          echo ""
+          echo "=== Testing SSH connectivity ==="
+          timeout 10 ssh -v ${{ secrets.PI_USER }}@${{ secrets.PI_HOST }} "echo ✓ SSH test successful" || echo "✗ SSH test failed"
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PI_HOST }}
+          username: ${{ secrets.PI_USER }}
+          key: ${{ secrets.PI_SSH_KEY }}
+          debug: true
+          script: |
+            set -e
+
+            echo "=== Starting deployment ==="
+            cd ${{ secrets.PI_PATH }}
+
+            echo "Pulling the repo..."
+            git pull origin main
+            cd src
+
+            echo "Stopping old containers..."
+            docker compose down || true
+
+            echo "Waiting for containers to be fully stopped..."
+            TIMEOUT=30
+            while [ $(docker ps -q | wc -l) -gt 0 ] && [ $TIMEOUT -gt 0 ]; do
+              echo "Waiting for containers to stop... ($TIMEOUT s left)"
+              sleep 2
+              TIMEOUT=$((TIMEOUT-2))
+            done
+            if [ $(docker ps -q | wc -l) -gt 0 ]; then
+              echo "❌ Some containers are still running after timeout. Aborting."
+              docker ps
+              exit 1
+            fi
+
+            echo "Launching Docker build in background..."
+            docker compose up -d --build
+
+            echo "Waiting for containers to start..."
+            sleep 60
+
+            echo "Check if the containers are running..."
+            UNHEALTHY=$(docker ps --filter "health=unhealthy" -q | wc -l)
+            if [ "$UNHEALTHY" -gt 0 ]; then
+              echo "❌ Unhealthy containers detected"
+              docker ps
+              docker logs $(docker ps -q)
+              exit 1
+            fi
+
+            echo "=== Deployment completed successfully ==="

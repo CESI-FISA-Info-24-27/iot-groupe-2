@@ -1,6 +1,7 @@
 // components/SensorCard.tsx
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { Platform, View, Text, StyleSheet } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SensorConfig } from '@/types/sensors';
 
 interface SensorCardProps {
@@ -34,12 +35,28 @@ export const SensorCard: React.FC<SensorCardProps> = ({ config, value, timestamp
   };
 
   return (
-    <View style={[styles.card, { borderLeftColor: statusColors[status] }]}>
+    <View style={[styles.card, { borderColor: statusColors[status] }]}>
+      <View style={[styles.glow, { backgroundColor: `${statusColors[status]}22` }]} />
+      <MaterialCommunityIcons
+        name={config.icon}
+        size={48}
+        color="#ffffff"
+        style={styles.watermark}
+      />
       <View style={styles.header}>
-        <Text style={styles.icon}>{config.icon}</Text>
-        <Text style={styles.name}>{config.name}</Text>
+        <View style={styles.iconWrap}>
+          <MaterialCommunityIcons name={config.icon} size={22} color="#e2e8f0" />
+        </View>
+        <View style={styles.headerText}>
+          <Text style={styles.name}>{config.name}</Text>
+          <View style={[styles.badge, { backgroundColor: `${statusColors[status]}22` }]}>
+            <Text style={[styles.badgeText, { color: statusColors[status] }]}>
+              {status}
+            </Text>
+          </View>
+        </View>
       </View>
-      
+
       <View style={styles.valueContainer}>
         {value === null ? (
           <Text style={styles.offline}>Hors ligne</Text>
@@ -61,30 +78,74 @@ export const SensorCard: React.FC<SensorCardProps> = ({ config, value, timestamp
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#1f2937',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    borderLeftWidth: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    backgroundColor: '#0f172a',
+    borderRadius: 20,
+    padding: 18,
+    borderWidth: 1,
+    shadowColor: '#0b1220',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.2,
+    shadowRadius: 18,
+    elevation: 4,
+    overflow: 'hidden',
+  },
+  glow: {
+    position: 'absolute',
+    top: -60,
+    right: -40,
+    width: 140,
+    height: 140,
+    borderRadius: 999,
+  },
+  watermark: {
+    position: 'absolute',
+    right: 12,
+    bottom: 8,
+    fontSize: 42,
+    opacity: 0.1,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
   },
+  iconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: '#111827',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
   icon: {
-    fontSize: 24,
-    marginRight: 8,
+    fontSize: 22,
+  },
+  headerText: {
+    flex: 1,
   },
   name: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#f3f4f6',
+    fontWeight: '700',
+    color: '#e2e8f0',
+    fontFamily: Platform.select({
+      ios: 'Avenir Next',
+      android: 'sans-serif-medium',
+      default: 'System',
+    }),
+  },
+  badge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    marginTop: 6,
+  },
+  badgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
   },
   valueContainer: {
     flexDirection: 'row',
@@ -94,16 +155,21 @@ const styles = StyleSheet.create({
   value: {
     fontSize: 36,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: '#f8fafc',
+    fontFamily: Platform.select({
+      ios: 'Avenir Next',
+      android: 'sans-serif',
+      default: 'System',
+    }),
   },
   unit: {
     fontSize: 18,
-    color: '#9ca3af',
+    color: '#94a3b8',
     marginLeft: 6,
   },
   offline: {
     fontSize: 18,
-    color: '#6b7280',
+    color: '#64748b',
     fontStyle: 'italic',
   },
   footer: {
@@ -118,6 +184,6 @@ const styles = StyleSheet.create({
   },
   lastUpdate: {
     fontSize: 12,
-    color: '#9ca3af',
+    color: '#94a3b8',
   },
 });

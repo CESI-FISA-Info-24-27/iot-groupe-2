@@ -43,7 +43,7 @@ class MQTTClient:
 
     def publish_json(self, topic: str, payload: dict, qos: int = 1, retain: bool = False) -> None:
         message = json.dumps(payload, ensure_ascii=True)
-        self._client.publish(topic, message, qos=qos, retain=retain)
+        result = self._client.publish(topic, message, qos=qos, retain=retain)
 
     def subscribe(self, topic: str, qos: int = 1) -> None:
         self._client.subscribe(topic, qos=qos)
