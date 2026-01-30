@@ -11,6 +11,10 @@ RUN apt-get update && apt-get install -y \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
+# Création d'un utilisateur dédié 'iotuser' et attribution des droits sur /dev
+RUN useradd -m iotuser \
+    && chown -R iotuser:iotuser /dev
+
 # On copie et installe les dépendances Python
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
@@ -19,5 +23,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app/ app/
 COPY config/ config/
 
-# On lance la commande par défaut
+# On lance la commande par défaut en tant que 'iotuser'
+USER iotuser
 CMD ["python", "app/main.py"]
