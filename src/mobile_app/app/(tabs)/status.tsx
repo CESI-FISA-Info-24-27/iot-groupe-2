@@ -9,12 +9,15 @@ import {
   Platform,
 } from 'react-native';
 import { API_ENDPOINTS } from '@/constants/config';
+import { useAppTheme } from '@/constants/theme';
 import { useBackendHealth } from '@/hooks/useBackendHealth';
 import { useSensorData } from '@/hooks/useSensorData';
 
 const SENSOR_TIMEOUT = 5000;
 
 export default function StatusScreen() {
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
   const backend = useBackendHealth();
   const sensors = useSensorData();
   const [refreshing, setRefreshing] = React.useState(false);
@@ -81,10 +84,10 @@ if (temperature != null && (temperature < -40 || temperature > 125)) {
 
   const globalColor =
     globalStatus === 'STABLE'
-      ? '#10b981'
+      ? theme.colors.success
       : globalStatus === 'ERREUR SYSTÈME'
-      ? '#ef4444'
-      : '#f59e0b';
+      ? theme.colors.danger
+      : theme.colors.warning;
 
   const backendStatus = backend.data?.status ?? 'unknown';
   const services = backend.data?.services ?? {};
@@ -109,7 +112,12 @@ if (temperature != null && (temperature < -40 || temperature > 125)) {
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[theme.colors.accent]}
+            tintColor={theme.colors.accent}
+          />
         }
       >
         {/* GLOBAL */}
@@ -129,10 +137,10 @@ if (temperature != null && (temperature < -40 || temperature > 125)) {
         {sensorStatuses.map((s, i) => {
           const color =
             s.status === 'OK'
-              ? '#10b981'
+              ? theme.colors.success
               : s.status === 'ERROR'
-              ? '#ef4444'
-              : '#f59e0b';
+              ? theme.colors.danger
+              : theme.colors.warning;
 
           return (
             <View key={i} style={[styles.statusCard, { borderColor: color }]}>
@@ -149,7 +157,7 @@ if (temperature != null && (temperature < -40 || temperature > 125)) {
           <Text style={styles.sectionSubtitle}>État de l’API</Text>
         </View>
 
-        <View style={[styles.statusCard, { borderColor: '#38bdf8' }]}>
+        <View style={[styles.statusCard, { borderColor: theme.colors.accent }]}>
           <Text style={styles.statusValue}>{backendStatus.toUpperCase()}</Text>
           <Text style={styles.statusHint}>Endpoint: {API_ENDPOINTS.health}</Text>
         </View>
@@ -178,9 +186,15 @@ function ServicePill({
   value: string;
   isLast?: boolean;
 }) {
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
   const normalized = value.toLowerCase();
   const color =
-    normalized === 'up' ? '#10b981' : normalized === 'down' ? '#ef4444' : '#64748b';
+    normalized === 'up'
+      ? theme.colors.success
+      : normalized === 'down'
+      ? theme.colors.danger
+      : theme.colors.textSubtle;
 
   return (
     <View
@@ -196,83 +210,83 @@ function ServicePill({
   );
 }
 
-/* ================== TES STYLES ORIGINAUX INCHANGÉS ================== */
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b1220' },
-  hero: {
-    paddingTop: Platform.OS === 'ios' ? 64 : 40,
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    overflow: 'hidden',
-  },
-  heroGlow: {
-    position: 'absolute',
-    top: -120,
-    right: -80,
-    width: 220,
-    height: 220,
-    backgroundColor: '#1d4ed8',
-    opacity: 0.25,
-    borderRadius: 999,
-  },
-  kicker: {
-    fontSize: 12,
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
-    color: '#38bdf8',
-    fontWeight: '700',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#f8fafc',
-    marginTop: 6,
-  },
-  subtitle: { fontSize: 14, color: '#94a3b8', marginTop: 6 },
-  content: { padding: 20 },
-  errorBanner: {
-    backgroundColor: '#7f1d1d',
-    padding: 12,
-    marginHorizontal: 20,
-    marginTop: 8,
-    borderRadius: 10,
-  },
-  errorText: { color: '#fecaca', fontSize: 13, textAlign: 'center' },
-  statusCard: {
-    backgroundColor: '#111827',
-    borderRadius: 18,
-    padding: 18,
-    borderWidth: 1,
-    marginBottom: 16,
-  },
-  statusLabel: {
-    color: '#94a3b8',
-    fontSize: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
-  },
-  statusValue: { fontSize: 24, fontWeight: '800', marginTop: 6 },
-  statusHint: { color: '#64748b', fontSize: 12, marginTop: 6 },
-  sectionHeader: { marginTop: 8, marginBottom: 12 },
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#e2e8f0' },
-  sectionSubtitle: { fontSize: 12, color: '#64748b', marginTop: 2 },
-  serviceGrid: { flexDirection: 'row', marginBottom: 16 },
-  servicePill: {
-    flex: 1,
-    backgroundColor: '#0f172a',
-    borderRadius: 16,
-    paddingVertical: 16,
-    paddingHorizontal: 14,
-    borderWidth: 1,
-    marginRight: 12,
-  },
-  servicePillLast: { marginRight: 0 },
-  serviceLabel: {
-    color: '#94a3b8',
-    fontSize: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  serviceValue: { fontSize: 18, fontWeight: '700', marginTop: 6 },
-});
+const getStyles = (theme: ReturnType<typeof useAppTheme>) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: theme.colors.background },
+    hero: {
+      paddingTop: Platform.OS === 'ios' ? 64 : 40,
+      paddingHorizontal: 20,
+      paddingBottom: 16,
+      overflow: 'hidden',
+    },
+    heroGlow: {
+      position: 'absolute',
+      top: -120,
+      right: -80,
+      width: 220,
+      height: 220,
+      backgroundColor: theme.colors.accent,
+      opacity: theme.isDark ? 0.25 : 0.18,
+      borderRadius: 999,
+    },
+    kicker: {
+      fontSize: 12,
+      letterSpacing: 1.5,
+      textTransform: 'uppercase',
+      color: theme.colors.accent,
+      fontWeight: '700',
+    },
+    title: {
+      fontSize: 28,
+      fontWeight: '800',
+      color: theme.colors.text,
+      marginTop: 6,
+    },
+    subtitle: { fontSize: 14, color: theme.colors.textMuted, marginTop: 6 },
+    content: { padding: 20 },
+    errorBanner: {
+      backgroundColor: theme.colors.dangerBg,
+      padding: 12,
+      marginHorizontal: 20,
+      marginTop: 8,
+      borderRadius: 10,
+    },
+    errorText: { color: theme.colors.text, fontSize: 13, textAlign: 'center' },
+    statusCard: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: 18,
+      padding: 18,
+      borderWidth: 1,
+      marginBottom: 16,
+    },
+    statusLabel: {
+      color: theme.colors.textMuted,
+      fontSize: 12,
+      textTransform: 'uppercase',
+      letterSpacing: 1.2,
+    },
+    statusValue: { fontSize: 24, fontWeight: '800', marginTop: 6, color: theme.colors.text },
+    statusHint: { color: theme.colors.textSubtle, fontSize: 12, marginTop: 6 },
+    sectionHeader: { marginTop: 8, marginBottom: 12 },
+    sectionTitle: { fontSize: 18, fontWeight: '700', color: theme.colors.text },
+    sectionSubtitle: { fontSize: 12, color: theme.colors.textSubtle, marginTop: 2 },
+    serviceGrid: { flexDirection: 'row', marginBottom: 16 },
+    servicePill: {
+      flex: 1,
+      backgroundColor: theme.colors.surfaceAlt,
+      borderRadius: 16,
+      paddingVertical: 16,
+      paddingHorizontal: 14,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      marginRight: 12,
+    },
+    servicePillLast: { marginRight: 0 },
+    serviceLabel: {
+      color: theme.colors.textMuted,
+      fontSize: 12,
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+    },
+    serviceValue: { fontSize: 18, fontWeight: '700', marginTop: 6, color: theme.colors.text },
+  });
