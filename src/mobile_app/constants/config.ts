@@ -2,14 +2,14 @@
 import { SensorConfig } from "@/types/sensors";
 
 // À remplacer par l'adresse IP du serveur IoT quand on l'aura
-export const API_BASE_URL = "http://10.75.92.111:3000";
+export const API_BASE_URL = "http://172.20.10.2:3000";
 
 export const API_ENDPOINTS = {
   sensorsHistory: `${API_BASE_URL}/api/sensors/history`,
   health: `${API_BASE_URL}/health`,
   cameraSnapshot: `${API_BASE_URL}/api/camera/snapshot`,
   cameraStream: `${API_BASE_URL}/api/camera/stream`,
-  camera: `http://10.75.92.2/capture`, // Snapshot caméra Raspberry Pi
+  camera: `http://172.20.10.2/stream`, // Snapshot caméra Raspberry Pi
 };
 
 // Configuration de chaque capteur

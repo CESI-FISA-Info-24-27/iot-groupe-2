@@ -6,13 +6,13 @@
 // CAMERA MODEL
 // ===========================
 #define CAMERA_MODEL_AI_THINKER
-#include "camera_pins.h"
+#include "../camera_pins.h"
 
 // ===========================
 // WIFI
 // ===========================
-const char* ssid = "iPhone de Lucas";
-const char* password = "mdpwifilulu";
+const char* ssid = "iPhone de coutinho (2)";
+const char* password = "87654321";
 
 // ===========================
 // WEB SERVER
