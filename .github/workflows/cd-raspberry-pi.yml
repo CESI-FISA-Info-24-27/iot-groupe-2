@@ -2,7 +2,7 @@ name: CD CesIoT Raspberry Pi
 
 on:
   push:
-    branches: [ "main", "feat/gateway" ]
+    branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
 
