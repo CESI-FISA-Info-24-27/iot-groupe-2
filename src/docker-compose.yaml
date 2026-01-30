@@ -58,8 +58,6 @@ services:
     volumes:
       - /var/run/dbus:/var/run/dbus
       - /dev/bus/usb:/dev/bus/usb
-      - /dev/serial:/dev/serial
-      - /dev:/dev
       - ./gateway/config:/app/config
     environment:
       - PYTHONUNBUFFERED=1
