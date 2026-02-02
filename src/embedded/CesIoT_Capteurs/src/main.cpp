@@ -33,9 +33,11 @@ unsigned long last_awake_time = 0;
 class MyServerCallbacks : public BLEServerCallbacks {
   void onConnect(BLEServer* pServer) override {
     deviceConnected = true;
+    BLEDevice::getAdvertising()->stop();
   }
   void onDisconnect(BLEServer* pServer) override {
     deviceConnected = false;
+    BLEDevice::getAdvertising()->start();
   }
 };
 
