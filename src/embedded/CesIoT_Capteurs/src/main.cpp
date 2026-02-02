@@ -41,17 +41,16 @@ class MyServerCallbacks : public BLEServerCallbacks {
 
 class RxCallbacks : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic* pCharacteristic) override {
-    std::string rx = pCharacteristic->getValue();
-    if (rx.empty()) {
+    String rx = pCharacteristic->getValue().c_str();
+    if (rx.length() == 0) {
       return;
     }
-    String message = String(rx.c_str());
-    if (message.indexOf("\"command\":\"wake\"") != -1) {
+    if (rx.indexOf("\"command\":\"wake\"") != -1) {
       is_awake = true;
       last_awake_time = millis();
-    } else if (message.indexOf("\"command\":\"sleep\"") != -1) {
+    } else if (rx.indexOf("\"command\":\"sleep\"") != -1) {
       is_awake = false;
-    } else if (message.indexOf("\"command\":\"reboot\"") != -1) {
+    } else if (rx.indexOf("\"command\":\"reboot\"") != -1) {
       delay(200);
       ESP.restart();
     }
