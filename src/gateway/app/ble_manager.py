@@ -253,6 +253,17 @@ class BLEManager:
             await asyncio.sleep(sensor.read_interval)
 
     async def _handle_ble_value(self, sensor: BleSensorConfig, data: bytes) -> None:
+        text = data.decode("utf-8", errors="ignore").strip()
+        if text:
+            try:
+                decoded = json.loads(text)
+            except json.JSONDecodeError:
+                decoded = None
+
+            if isinstance(decoded, dict) and decoded.get("sensor_type"):
+                self._publish_ecoguard(decoded, sensor)
+                return
+
         payload = self._parse_payload(sensor, data)
         telemetry = Telemetry(
             sensor_id=sensor.sensor_id,
@@ -337,4 +348,16 @@ class BLEManager:
             "value": telemetry.value,
             "ts": telemetry.ts,
         }
+        self._mqtt.publish_json(topic, payload, qos=1, retain=False)
+
+    def _publish_ecoguard(self, payload: dict, sensor: BleSensorConfig) -> None:
+        room_id = payload.get("room_id") or sensor.room
+        sensor_type = payload.get("sensor_type") or payload.get("metric") or sensor.metric
+
+        if room_id:
+            payload["room_id"] = room_id
+        if sensor_type:
+            payload["sensor_type"] = sensor_type
+
+        topic = f"ecoguard/sensors/{room_id}/{sensor_type}"
         self._mqtt.publish_json(topic, payload, qos=1, retain=False)

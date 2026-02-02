@@ -7,14 +7,54 @@
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BMP280.h>
 
-// Callback pour gérer la reconnexion BLE
+// ===== CONFIGURATION BLE =====
+#define DEVICE_NAME "ESP32_Capteurs"
+#define SERVICE_UUID "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
+#define CHAR_TX_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"  // ESP32 -> Gateway (notify)
+#define CHAR_RX_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a9"  // Gateway -> ESP32 (write)
+
+// ===== CONFIGURATION PROJET =====
+const char* room_id = "C4";
+const char* device_id = "esp32_sensor_001";
+const char* sensor_id_bmp280 = "bmp280";
+const char* sensor_id_hcsr04 = "hcsr04";
+const char* sensor_id_mic = "mic";
+
+// ===== ÉTAT BLE =====
+BLEServer* pServer = nullptr;
+BLECharacteristic* pTxCharacteristic = nullptr;
+BLECharacteristic* pRxCharacteristic = nullptr;
+bool deviceConnected = false;
+bool oldDeviceConnected = false;
+bool is_awake = true;
+unsigned long last_awake_time = 0;
+
+// Callback BLE
 class MyServerCallbacks : public BLEServerCallbacks {
   void onConnect(BLEServer* pServer) override {
-    // Client connecté
+    deviceConnected = true;
   }
   void onDisconnect(BLEServer* pServer) override {
-    // Client déconnecté, relance de la publicité BLE
-    BLEDevice::getAdvertising()->start();
+    deviceConnected = false;
+  }
+};
+
+class RxCallbacks : public BLECharacteristicCallbacks {
+  void onWrite(BLECharacteristic* pCharacteristic) override {
+    std::string rx = pCharacteristic->getValue();
+    if (rx.empty()) {
+      return;
+    }
+    String message = String(rx.c_str());
+    if (message.indexOf("\"command\":\"wake\"") != -1) {
+      is_awake = true;
+      last_awake_time = millis();
+    } else if (message.indexOf("\"command\":\"sleep\"") != -1) {
+      is_awake = false;
+    } else if (message.indexOf("\"command\":\"reboot\"") != -1) {
+      delay(200);
+      ESP.restart();
+    }
   }
 };
 
@@ -34,20 +74,12 @@ class MyServerCallbacks : public BLEServerCallbacks {
 
 Adafruit_BMP280 bmp(BMP_CS, BMP_SDI, BMP_SDO, BMP_SCK);
 
-// BLE UUIDs pour chaque service et caractéristique
-#define SERVICE_UUID_TEMP     "00002a6e-0000-1000-8000-00805f9b34fb"
-#define CHAR_UUID_TEMP        "00002a6e-0000-1000-8000-00805f9b34fb"
-#define SERVICE_UUID_PRESS    "00002a6d-0000-1000-8000-00805f9b34fb"
-#define CHAR_UUID_PRESS       "00002a6d-0000-1000-8000-00805f9b34fb"
-#define SERVICE_UUID_SON      "00002a74-0000-1000-8000-00805f9b34fb"
-#define CHAR_UUID_SON         "00002a74-0000-1000-8000-00805f9b34fb"
-#define SERVICE_UUID_DIST     "12345678-1234-1234-1234-123456789abc"
-#define CHAR_UUID_DIST        "12345678-1234-1234-1234-123456789abc"
-
-BLECharacteristic *pCharTemp;
-BLECharacteristic *pCharPress;
-BLECharacteristic *pCharSon;
-BLECharacteristic *pCharDist;
+static void sendBLEMessage(const String& message) {
+  if (deviceConnected && pTxCharacteristic != nullptr) {
+    pTxCharacteristic->setValue(message.c_str());
+    pTxCharacteristic->notify();
+  }
+}
 
 void setup() {
   Serial.begin(115200);
@@ -71,62 +103,31 @@ void setup() {
   pinMode(ECHO_PIN, INPUT);
 
   // BLE
-  BLEDevice::init("ESP32_Capteurs");
-  Serial.println("[BLE] Initialisation BLEDevice OK");
-  BLEServer *pServer = BLEDevice::createServer();
+  BLEDevice::init(DEVICE_NAME);
+  pServer = BLEDevice::createServer();
   pServer->setCallbacks(new MyServerCallbacks());
-  Serial.println("[BLE] Serveur BLE créé");
 
-  // Service Température
-  BLEService *pServiceTemp = pServer->createService(SERVICE_UUID_TEMP);
-  pCharTemp = pServiceTemp->createCharacteristic(
-    CHAR_UUID_TEMP,
-    BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY
+  BLEService* pService = pServer->createService(SERVICE_UUID);
+  pTxCharacteristic = pService->createCharacteristic(
+    CHAR_TX_UUID,
+    BLECharacteristic::PROPERTY_NOTIFY
   );
-  pCharTemp->addDescriptor(new BLE2902());
-  pCharTemp->setValue("Init");
-  pServiceTemp->start();
-  Serial.println("[BLE] Service Température lancé");
+  pTxCharacteristic->addDescriptor(new BLE2902());
 
-  // Service Pression
-  BLEService *pServicePress = pServer->createService(SERVICE_UUID_PRESS);
-  pCharPress = pServicePress->createCharacteristic(
-    CHAR_UUID_PRESS,
-    BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY
+  pRxCharacteristic = pService->createCharacteristic(
+    CHAR_RX_UUID,
+    BLECharacteristic::PROPERTY_WRITE
   );
-  pCharPress->addDescriptor(new BLE2902());
-  pCharPress->setValue("Init");
-  pServicePress->start();
-  Serial.println("[BLE] Service Pression lancé");
+  pRxCharacteristic->setCallbacks(new RxCallbacks());
 
-  // Service Son
-  BLEService *pServiceSon = pServer->createService(SERVICE_UUID_SON);
-  pCharSon = pServiceSon->createCharacteristic(
-    CHAR_UUID_SON,
-    BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY
-  );
-  pCharSon->addDescriptor(new BLE2902());
-  pCharSon->setValue("Init");
-  pServiceSon->start();
-  Serial.println("[BLE] Service Son lancé");
+  pService->start();
 
-  // Service Distance
-  BLEService *pServiceDist = pServer->createService(SERVICE_UUID_DIST);
-  pCharDist = pServiceDist->createCharacteristic(
-    CHAR_UUID_DIST,
-    BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY
-  );
-  pCharDist->addDescriptor(new BLE2902());
-  pCharDist->setValue("Init");
-  pServiceDist->start();
-  Serial.println("[BLE] Service Distance lancé");
-
-  BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
-  pAdvertising->addServiceUUID(SERVICE_UUID_TEMP);
-  pAdvertising->addServiceUUID(SERVICE_UUID_PRESS);
-  pAdvertising->addServiceUUID(SERVICE_UUID_SON);
-  pAdvertising->addServiceUUID(SERVICE_UUID_DIST);
-  pAdvertising->start();
+  BLEAdvertising* pAdvertising = BLEDevice::getAdvertising();
+  pAdvertising->addServiceUUID(SERVICE_UUID);
+  pAdvertising->setScanResponse(true);
+  pAdvertising->setMinPreferred(0x06);
+  pAdvertising->setMaxPreferred(0x12);
+  BLEDevice::startAdvertising();
   Serial.println("[BLE] Publicité BLE lancée, serveur prêt !");
 }
 
@@ -146,6 +147,20 @@ float lireDistanceCM()
 
 void loop() 
 {
+  if (!deviceConnected && oldDeviceConnected) {
+    delay(500);
+    pServer->startAdvertising();
+    oldDeviceConnected = deviceConnected;
+  }
+  if (deviceConnected && !oldDeviceConnected) {
+    oldDeviceConnected = deviceConnected;
+  }
+
+  if (!is_awake) {
+    delay(100);
+    return;
+  }
+
   // ---------- BMP280 ----------
   float temp = bmp.readTemperature();
   float press = bmp.readPressure() / 100.0;
@@ -164,24 +179,47 @@ void loop()
   // ---------- HC-SR04 ----------
   float distance = lireDistanceCM();
 
-  // ---------- BLE ENVOI ----------
-  char bufTemp[16], bufPress[16], bufSon[16], bufDist[16];
-  snprintf(bufTemp, sizeof(bufTemp), "%.2f", temp);
-  snprintf(bufPress, sizeof(bufPress), "%.2f", press);
-  snprintf(bufSon, sizeof(bufSon), "%d", amplitude);
-  if (distance < 0) {
-    snprintf(bufDist, sizeof(bufDist), "-1");
-  } else {
-    snprintf(bufDist, sizeof(bufDist), "%.2f", distance);
-  }
-  pCharTemp->setValue((uint8_t*)bufTemp, strlen(bufTemp));
-  pCharTemp->notify();
-  pCharPress->setValue((uint8_t*)bufPress, strlen(bufPress));
-  pCharPress->notify();
-  pCharSon->setValue((uint8_t*)bufSon, strlen(bufSon));
-  pCharSon->notify();
-  pCharDist->setValue((uint8_t*)bufDist, strlen(bufDist));
-  pCharDist->notify();
+  // ---------- BLE ENVOI (JSON sur une seule caractéristique) ----------
+  unsigned long timestamp = millis();
+  char json_msg[256];
 
-  delay(500);
+  snprintf(
+    json_msg,
+    sizeof(json_msg),
+    "{\"device_id\":\"%s\",\"parent_device_id\":\"%s\",\"room_id\":\"%s\","
+    "\"sensor_type\":\"temperature\",\"value\":%.2f,\"unit\":\"C\",\"timestamp\":%lu}",
+    sensor_id_bmp280, device_id, room_id, temp, timestamp
+  );
+  sendBLEMessage(String(json_msg));
+
+  snprintf(
+    json_msg,
+    sizeof(json_msg),
+    "{\"device_id\":\"%s\",\"parent_device_id\":\"%s\",\"room_id\":\"%s\","
+    "\"sensor_type\":\"pressure\",\"value\":%.2f,\"unit\":\"hPa\",\"timestamp\":%lu}",
+    sensor_id_bmp280, device_id, room_id, press, timestamp
+  );
+  sendBLEMessage(String(json_msg));
+
+  snprintf(
+    json_msg,
+    sizeof(json_msg),
+    "{\"device_id\":\"%s\",\"parent_device_id\":\"%s\",\"room_id\":\"%s\","
+    "\"sensor_type\":\"sound\",\"amplitude\":%d,\"timestamp\":%lu}",
+    sensor_id_mic, device_id, room_id, amplitude, timestamp
+  );
+  sendBLEMessage(String(json_msg));
+
+  if (distance >= 0) {
+    snprintf(
+      json_msg,
+      sizeof(json_msg),
+      "{\"device_id\":\"%s\",\"parent_device_id\":\"%s\",\"room_id\":\"%s\","
+      "\"sensor_type\":\"distance\",\"value\":%.2f,\"unit\":\"cm\",\"timestamp\":%lu}",
+      sensor_id_hcsr04, device_id, room_id, distance, timestamp
+    );
+    sendBLEMessage(String(json_msg));
+  }
+
+  delay(1000);
 }

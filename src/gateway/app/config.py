@@ -104,6 +104,23 @@ def _default_simulated_sensors() -> List[BleSensorConfig]:
 def _sensors_from_env() -> List[BleSensorConfig]:
     # Construction explicite des capteurs à partir des variables d'environnement
     sensors = []
+    # Mode "JSON" (un seul service / une seule caractéristique)
+    json_uuid = os.environ.get("BLE_JSON_CHAR_UUID")
+    if json_uuid:
+        sensors.append(BleSensorConfig(
+            sensor_id=os.environ.get("BLE_SENSOR_ID", "ble-ecoguard"),
+            room=os.environ.get("BLE_ROOM", "C4"),
+            name=os.environ.get("BLE_DEVICE_NAME", "ESP32_Capteurs"),
+            address=os.environ.get("BLE_DEVICE_ADDRESS") or None,
+            telemetry_uuid=json_uuid,
+            command_uuid=os.environ.get("BLE_COMMAND_CHAR_UUID") or None,
+            mode="notify",
+            read_interval=float(os.environ.get("BLE_READ_INTERVAL", "1.0")),
+            metric="json",
+            simulated=False,
+        ))
+        return sensors
+
     # Température
     temp_uuid = os.environ.get("CHAR_TEMP_UUID")
     if temp_uuid:
