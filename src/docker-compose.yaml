@@ -62,7 +62,8 @@ services:
     devices:
       - /dev/hci0:/dev/hci0
     volumes:
-      - /var/run/dbus:/var/run/dbus
+      - /run/dbus:/run/dbus
+      - /etc/machine-id:/etc/machine-id:ro
       - ./gateway/config:/app/config
     environment:
       - PYTHONUNBUFFERED=1
