@@ -9,8 +9,8 @@ from urllib.error import URLError, HTTPError
 router = APIRouter(prefix="/api/camera", tags=["camera"])
 logger = logging.getLogger("camera")
 
-DEFAULT_SNAPSHOT_URL = "http://172.20.10.3/snapshot"
-DEFAULT_STREAM_URL = "http://172.20.10.3/stream"
+DEFAULT_SNAPSHOT_URL = "http://172.20.10.13/snapshot"
+DEFAULT_STREAM_URL = "http://172.20.10.13/stream"
 _cache_lock = Lock()
 _last_frame = None
 _last_ts = 0.0
