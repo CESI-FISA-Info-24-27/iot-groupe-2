@@ -2,7 +2,7 @@ import asyncio
 import json
 import random
 from dataclasses import dataclass
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from bleak import BleakClient, BleakScanner
 
@@ -24,23 +24,41 @@ class BLEManager:
         self._config = config
         self._mqtt = mqtt
         self._tasks: Dict[str, asyncio.Task] = {}
+        self._device_tasks: Dict[str, asyncio.Task] = {}
         self._clients: Dict[str, BleakClient] = {}
         self._stop_event = asyncio.Event()
         self._scan_lock = asyncio.Lock()
 
     async def start(self) -> None:
+        device_groups: Dict[str, List[BleSensorConfig]] = {}
+
         for sensor in self._config.sensors:
-            if sensor.sensor_id in self._tasks:
+            if sensor.simulated:
+                if sensor.sensor_id in self._tasks:
+                    continue
+                task = asyncio.create_task(self._run_sensor(sensor))
+                self._tasks[sensor.sensor_id] = task
                 continue
-            task = asyncio.create_task(self._run_sensor(sensor))
-            self._tasks[sensor.sensor_id] = task
+
+            key = self._device_key(sensor)
+            device_groups.setdefault(key, []).append(sensor)
+
+        for key, sensors in device_groups.items():
+            if key in self._device_tasks:
+                continue
+            task = asyncio.create_task(self._run_device_group(key, sensors))
+            self._device_tasks[key] = task
 
     async def stop(self) -> None:
         self._stop_event.set()
-        for task in self._tasks.values():
+        for task in list(self._tasks.values()) + list(self._device_tasks.values()):
             task.cancel()
-        await asyncio.gather(*self._tasks.values(), return_exceptions=True)
-        for client in self._clients.values():
+        await asyncio.gather(
+            *list(self._tasks.values()),
+            *list(self._device_tasks.values()),
+            return_exceptions=True,
+        )
+        for client in set(self._clients.values()):
             if client.is_connected:
                 await client.disconnect()
 
@@ -121,6 +139,93 @@ class BLEManager:
 
             await asyncio.sleep(self._config.reconnect_delay)
 
+    async def _run_device_group(self, key: str, sensors: List[BleSensorConfig]) -> None:
+        sensor_ids = ", ".join(sensor.sensor_id for sensor in sensors)
+        print(f"[BLE] Démarrage du groupe {key} ({sensor_ids})")
+
+        while not self._stop_event.is_set():
+            disconnect_event = asyncio.Event()
+            connected = False
+            offline_published = False
+            client: Optional[BleakClient] = None
+            notify_uuids: List[Tuple[BleSensorConfig, str]] = []
+            read_tasks: List[asyncio.Task] = []
+
+            def _on_disconnect(_client) -> None:
+                print(f"[BLE] Déconnexion du groupe {key}")
+                disconnect_event.set()
+
+            try:
+                device = await self._find_device_group(sensors)
+                if not device:
+                    print(f"[BLE] Groupe {key} non trouvé, nouvel essai dans {self._config.scan_interval}s")
+                    await asyncio.sleep(self._config.scan_interval)
+                    continue
+
+                print(f"[BLE] Connexion au groupe {key} ({device})...")
+                client = BleakClient(device, disconnected_callback=_on_disconnect)
+                await client.connect()
+                connected = True
+                print(f"[BLE] Groupe {key} connecté !")
+
+                for sensor in sensors:
+                    self._clients[sensor.sensor_id] = client
+                    self._publish_status(sensor, "ONLINE")
+
+                for sensor in sensors:
+                    if sensor.telemetry_uuid and sensor.mode == "notify":
+                        notify_uuids.append((sensor, sensor.telemetry_uuid))
+
+                for sensor, telemetry_uuid in notify_uuids:
+                    await client.start_notify(
+                        telemetry_uuid,
+                        lambda _sender, data, s=sensor: asyncio.create_task(
+                            self._handle_ble_value(s, data)
+                        ),
+                    )
+
+                for sensor in sensors:
+                    if sensor.mode != "notify":
+                        read_tasks.append(
+                            asyncio.create_task(self._read_loop(sensor, client, disconnect_event))
+                        )
+
+                await asyncio.wait(
+                    [disconnect_event.wait(), self._stop_event.wait()],
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+            except asyncio.CancelledError:
+                break
+            except Exception as exc:
+                print(f"[BLE][ERREUR] Groupe {key} : {exc}")
+                for sensor in sensors:
+                    self._publish_status(sensor, "OFFLINE", reason=str(exc))
+                offline_published = True
+            finally:
+                for task in read_tasks:
+                    task.cancel()
+                if read_tasks:
+                    await asyncio.gather(*read_tasks, return_exceptions=True)
+
+                if client and client.is_connected:
+                    for sensor, telemetry_uuid in notify_uuids:
+                        try:
+                            await client.stop_notify(telemetry_uuid)
+                        except Exception:
+                            pass
+
+                if connected and not offline_published:
+                    for sensor in sensors:
+                        self._publish_status(sensor, "OFFLINE", reason="ble_disconnect")
+
+                for sensor in sensors:
+                    self._clients.pop(sensor.sensor_id, None)
+
+                if client and client.is_connected:
+                    await client.disconnect()
+
+            await asyncio.sleep(self._config.reconnect_delay)
+
     async def _run_simulated_sensor(self, sensor: BleSensorConfig) -> None:
         self._publish_status(sensor, "ONLINE")
         while not self._stop_event.is_set():
@@ -187,9 +292,34 @@ class BLEManager:
         async with self._scan_lock:
             devices = await BleakScanner.discover(timeout=self._config.scan_interval)
         for device in devices:
+            if sensor.address and device.address and device.address.lower() == sensor.address.lower():
+                return device
             if sensor.name and device.name == sensor.name:
                 return device
         return None
+
+    async def _find_device_group(self, sensors: List[BleSensorConfig]):
+        async with self._scan_lock:
+            devices = await BleakScanner.discover(timeout=self._config.scan_interval)
+
+        wanted_addresses = {
+            s.address.lower() for s in sensors if s.address
+        }
+        wanted_names = {s.name for s in sensors if s.name}
+
+        for device in devices:
+            if device.address and device.address.lower() in wanted_addresses:
+                return device
+            if device.name and device.name in wanted_names:
+                return device
+        return None
+
+    def _device_key(self, sensor: BleSensorConfig) -> str:
+        if sensor.address:
+            return sensor.address.lower()
+        if sensor.name:
+            return sensor.name
+        return sensor.sensor_id
 
     def _publish_status(self, sensor: BleSensorConfig, status: str, reason: Optional[str] = None) -> None:
         payload = {"status": status, "ts": now_ts()}
