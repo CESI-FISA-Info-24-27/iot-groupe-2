@@ -11,7 +11,6 @@ from routes.sensors import router as sensors_router
 from routes.camera import router as camera_router
 from websocket.ws import ws_manager
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events"""
@@ -139,7 +138,6 @@ async def websocket_endpoint(websocket: WebSocket):
 # Include routers
 app.include_router(sensors_router)
 app.include_router(camera_router)
-
 
 if __name__ == "__main__":
     import uvicorn

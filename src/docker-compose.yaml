@@ -3,17 +3,17 @@ services:
     build: ./backend
     container_name: api
     environment:
-      - PORT=${BACKEND_ORIGIN_PORT?:BACKEND_ORIGIN_PORT manquant}
+      - PORT=${BACKEND_ORIGIN_PORT:?BACKEND_ORIGIN_PORT manquant}
       - MQTT_HOST=mqtt-broker
-      - MQTT_PORT=${MQTT_BROKER_DEST_PORT?:MQTT_BROKER_DEST_PORT manquant}
-      - MQTT_USERNAME=${MQTT_BROKER_USERNAME?:MQTT_BROKER_USERNAME manquant}
-      - MQTT_PASSWORD=${MQTT_BROKER_PASSWORD?:MQTT_BROKER_PASSWORD manquant}
-      - INFLUX_URL=http://influxdb:${INFLUXDB_DEST_PORT?:INFLUXDB_DEST_PORT manquant}
-      - INFLUX_ORG=${INFLUXDB_INIT_ORG?:INFLUXDB_INIT_ORG manquant}
-      - INFLUX_BUCKET=${INFLUXDB_INIT_BUCKET?:INFLUXDB_INIT_BUCKET manquant}
-      - INFLUX_TOKEN=${INFLUXDB_INIT_ADMIN_TOKEN?:INFLUXDB_INIT_ADMIN_TOKEN manquant}
+      - MQTT_PORT=${MQTT_BROKER_DEST_PORT:?MQTT_BROKER_DEST_PORT manquant}
+      - MQTT_USERNAME=${MQTT_BROKER_USERNAME:?MQTT_BROKER_USERNAME manquant}
+      - MQTT_PASSWORD=${MQTT_BROKER_PASSWORD:?MQTT_BROKER_PASSWORD manquant}
+      - INFLUX_URL=http://influxdb:${INFLUXDB_DEST_PORT:?INFLUXDB_DEST_PORT manquant}
+      - INFLUX_ORG=${INFLUXDB_INIT_ORG:?INFLUXDB_INIT_ORG manquant}
+      - INFLUX_BUCKET=${INFLUXDB_INIT_BUCKET:?INFLUXDB_INIT_BUCKET manquant}
+      - INFLUX_TOKEN=${INFLUXDB_INIT_ADMIN_TOKEN:?INFLUXDB_INIT_ADMIN_TOKEN manquant}
     ports:
-      - "${BACKEND_ORIGIN_PORT?:BACKEND_ORIGIN_PORT manquant}:${BACKEND_DEST_PORT?:BACKEND_DEST_PORT manquant}"
+      - "${BACKEND_ORIGIN_PORT:?BACKEND_ORIGIN_PORT manquant}:${BACKEND_DEST_PORT:?BACKEND_DEST_PORT manquant}"
     volumes:
       - ./backend:/app
     restart: unless-stopped
@@ -32,15 +32,15 @@ services:
     build: ./mqtt-broker
     container_name: mqtt-broker
     ports:
-      - "${MQTT_BROKER_ORIGIN_PORT?:MQTT_BROKER_ORIGIN_PORT manquant}:${MQTT_BROKER_DEST_PORT?:MQTT_BROKER_DEST_PORT manquant}"
+      - "${MQTT_BROKER_ORIGIN_PORT:?MQTT_BROKER_ORIGIN_PORT manquant}:${MQTT_BROKER_DEST_PORT?:MQTT_BROKER_DEST_PORT manquant}"
     volumes:
       - ./mqtt-broker/config:/mosquitto/config
       - ./mqtt-broker/data:/mosquitto/data
       - ./mqtt-broker/log:/mosquitto/log
     restart: unless-stopped
     environment:
-      - MOSQUITTO_USERNAME=${MQTT_BROKER_USERNAME?:MQTT_BROKER_USERNAME manquant}
-      - MOSQUITTO_PASSWORD=${MQTT_BROKER_PASSWORD?:MQTT_BROKER_PASSWORD manquant}
+      - MOSQUITTO_USERNAME=${MQTT_BROKER_USERNAME:?MQTT_BROKER_USERNAME manquant}
+      - MOSQUITTO_PASSWORD=${MQTT_BROKER_PASSWORD:?MQTT_BROKER_PASSWORD manquant}
     healthcheck:
       test:
         [
@@ -55,14 +55,26 @@ services:
     build: ./gateway
     container_name: gateway
     privileged: true
+    devices:
+      - /dev/hci0:/dev/hci0
     volumes:
       - /var/run/dbus:/var/run/dbus
       - ./gateway/config:/app/config
     environment:
       - PYTHONUNBUFFERED=1
-      - CONFIG_FILE=${BRIDGE_BLE_MQTT_CONFIG_FILE?:BRIDGE_BLE_MQTT_CONFIG_FILE manquant}
+      - CONFIG_FILE=${BRIDGE_BLE_MQTT_CONFIG_FILE:?BRIDGE_BLE_MQTT_CONFIG_FILE manquant}
       - MQTT_BROKER_HOST=localhost
-      - MQTT_BROKER_PORT=${MQTT_BROKER_DEST_PORT?:MQTT_BROKER_DEST_PORT manquant}
+      - MQTT_BROKER_PORT=${MQTT_BROKER_DEST_PORT:?MQTT_BROKER_DEST_PORT manquant}
+      - MQTT_BROKER_USERNAME=${MQTT_BROKER_USERNAME:?MQTT_BROKER_USERNAME manquant}
+      - MQTT_BROKER_PASSWORD=${MQTT_BROKER_PASSWORD:?MQTT_BROKER_PASSWORD manquant}
+      - SERVICE_TEMPERATURE_UUID=${SERVICE_TEMPERATURE_UUID:?SERVICE_TEMPERATURE_UUID manquant}
+      - CHAR_TEMP_UUID=${CHAR_TEMP_UUID:?CHAR_TEMP_UUID manquant}
+      - SERVICE_PRESSURE_UUID=${SERVICE_PRESSURE_UUID:?SERVICE_PRESSURE_UUID manquant}
+      - CHAR_PRESSURE_UUID=${CHAR_PRESSURE_UUID:?CHAR_PRESSURE_UUID manquant}
+      - SERVICE_SOUND_UUID=${SERVICE_SOUND_UUID:?SERVICE_SOUND_UUID manquant}
+      - CHAR_SOUND_UUID=${CHAR_SOUND_UUID:?CHAR_SOUND_UUID manquant}
+      - SERVICE_DISTANCE_UUID=${SERVICE_DISTANCE_UUID:?SERVICE_DISTANCE_UUID manquant}
+      - CHAR_DISTANCE_UUID=${CHAR_DISTANCE_UUID:?CHAR_DISTANCE_UUID manquant}
     restart: unless-stopped
     network_mode: "host"
     depends_on:
@@ -82,14 +94,14 @@ services:
     image: influxdb:2.7
     container_name: influxdb
     environment:
-      - DOCKER_INFLUXDB_INIT_MODE=${INFLUXDB_INIT_MODE?:INFLUXDB_INIT_MODE manquant}
-      - DOCKER_INFLUXDB_INIT_USERNAME=${INFLUXDB_INIT_USERNAME?:INFLUXDB_INIT_USERNAME manquant}
-      - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUXDB_INIT_PASSWORD?:INFLUXDB_INIT_PASSWORD manquant}
-      - DOCKER_INFLUXDB_INIT_ORG=${INFLUXDB_INIT_ORG?:INFLUXDB_INIT_ORG manquant}
-      - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUXDB_INIT_BUCKET?:INFLUXDB_INIT_BUCKET manquant}
-      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUXDB_INIT_ADMIN_TOKEN?:INFLUXDB_INIT_ADMIN_TOKEN manquant}
+      - DOCKER_INFLUXDB_INIT_MODE=${INFLUXDB_INIT_MODE:?INFLUXDB_INIT_MODE manquant}
+      - DOCKER_INFLUXDB_INIT_USERNAME=${INFLUXDB_INIT_USERNAME:?INFLUXDB_INIT_USERNAME manquant}
+      - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUXDB_INIT_PASSWORD:?INFLUXDB_INIT_PASSWORD manquant}
+      - DOCKER_INFLUXDB_INIT_ORG=${INFLUXDB_INIT_ORG:?INFLUXDB_INIT_ORG manquant}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUXDB_INIT_BUCKET:?INFLUXDB_INIT_BUCKET manquant}
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUXDB_INIT_ADMIN_TOKEN:?INFLUXDB_INIT_ADMIN_TOKEN manquant}
     ports:
-      - "${INFLUXDB_ORIGIN_PORT?:INFLUXDB_ORIGIN_PORT manquant}:${INFLUXDB_DEST_PORT?:INFLUXDB_DEST_PORT manquant}"
+      - "${INFLUXDB_ORIGIN_PORT:?INFLUXDB_ORIGIN_PORT manquant}:${INFLUXDB_DEST_PORT:?INFLUXDB_DEST_PORT manquant}"
     volumes:
       - ./databases/influxdb:/var/lib/influxdb2
     restart: unless-stopped
@@ -97,7 +109,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          'curl -fsS --max-time 15 http://localhost:${INFLUXDB_DEST_PORT?:INFLUXDB_DEST_PORT manquant}/health | grep ''"status":"pass"'' || exit 1',
+          'curl -fsS --max-time 15 http://localhost:${INFLUXDB_DEST_PORT:?INFLUXDB_DEST_PORT manquant}/health | grep ''"status":"pass"'' || exit 1',
         ]
       interval: 10s
       timeout: 10s
@@ -113,7 +125,7 @@ services:
       - REACT_NATIVE_PACKAGER_HOSTNAME=localhost
       - BACKEND_URL=http://api:${BACKEND_DEST_PORT}
     ports:
-      - "${MOBILE_APP_ORIGIN_PORT?:MOBILE_APP_ORIGIN_PORT manquant}:${MOBILE_APP_DEST_PORT?:MOBILE_APP_DEST_PORT manquant}"
+      - "${MOBILE_APP_ORIGIN_PORT:?MOBILE_APP_ORIGIN_PORT manquant}:${MOBILE_APP_DEST_PORT?:MOBILE_APP_DEST_PORT manquant}"
     restart: unless-stopped
     depends_on:
       api:

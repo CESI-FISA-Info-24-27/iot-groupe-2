@@ -31,13 +31,19 @@ ls -la /mosquitto/config/ || echo "Le répertoire /mosquitto/config n'existe pas
 chmod 755 /mosquitto/config 2>&1 || echo "Impossible de changer les permissions du répertoire"
 echo "Permissions du répertoire: $(ls -ld /mosquitto/config | awk '{print $1}')"
 
+
 # On crée le fichier passwd
 echo "Création du fichier passwd..."
 mosquitto_passwd -c -b "$PASSWD_FILE" "$MOSQUITTO_USERNAME" "$MOSQUITTO_PASSWORD"
+chown mosquitto:mosquitto "$PASSWD_FILE"
+chmod 640 "$PASSWD_FILE"
 
-# Vérifier que le fichier a été créé
+ # Vérifier que le fichier a été créé
 if [ -f "$PASSWD_FILE" ]; then
     echo "✓ Fichier créé"
+
+# Lancer Mosquitto (process principal du conteneur)
+exec mosquitto -c /mosquitto/config/mosquitto.conf
     ls -la "$PASSWD_FILE"
     
     # Fixer les permissions du fichier
