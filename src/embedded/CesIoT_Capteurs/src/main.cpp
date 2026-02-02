@@ -3,10 +3,9 @@
 #include <BLEUtils.h>
 #include <BLE2902.h>
 
-#include <BLEDevice.h>
-#include <BLEServer.h>
-#include <BLEUtils.h>
-#include <BLE2902.h>
+#include <SPI.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BMP280.h>
 
 // Callback pour gérer la reconnexion BLE
 class MyServerCallbacks : public BLEServerCallbacks {
@@ -18,15 +17,6 @@ class MyServerCallbacks : public BLEServerCallbacks {
     BLEDevice::getAdvertising()->start();
   }
 };
-#include <SPI.h>
-#include <Adafruit_Sensor.h>
-#include <Adafruit_BMP280.h>
-
-// ---------- BLE ----------
-#include <BLEDevice.h>
-#include <BLEServer.h>
-#include <BLEUtils.h>
-#include <BLE2902.h>
 
 // ---------- BMP280 ----------
 #define BMP_CS   4

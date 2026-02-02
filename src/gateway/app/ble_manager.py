@@ -26,6 +26,7 @@ class BLEManager:
         self._tasks: Dict[str, asyncio.Task] = {}
         self._clients: Dict[str, BleakClient] = {}
         self._stop_event = asyncio.Event()
+        self._scan_lock = asyncio.Lock()
 
     async def start(self) -> None:
         for sensor in self._config.sensors:
@@ -183,10 +184,8 @@ class BLEManager:
         return {"metric": sensor.metric, "value": None, "ts": ts}
 
     async def _find_device(self, sensor: BleSensorConfig):
-        if sensor.address:
-            return sensor.address
-
-        devices = await BleakScanner.discover(timeout=self._config.scan_interval)
+        async with self._scan_lock:
+            devices = await BleakScanner.discover(timeout=self._config.scan_interval)
         for device in devices:
             if sensor.name and device.name == sensor.name:
                 return device
