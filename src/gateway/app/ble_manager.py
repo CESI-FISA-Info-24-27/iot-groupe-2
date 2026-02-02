@@ -190,10 +190,15 @@ class BLEManager:
                             asyncio.create_task(self._read_loop(sensor, client, disconnect_event))
                         )
 
-                await asyncio.wait(
-                    [disconnect_event.wait(), self._stop_event.wait()],
+                disconnect_task = asyncio.create_task(disconnect_event.wait())
+                stop_task = asyncio.create_task(self._stop_event.wait())
+                done, pending = await asyncio.wait(
+                    [disconnect_task, stop_task],
                     return_when=asyncio.FIRST_COMPLETED,
                 )
+                for task in pending:
+                    task.cancel()
+                await asyncio.gather(*pending, return_exceptions=True)
             except asyncio.CancelledError:
                 break
             except Exception as exc:
