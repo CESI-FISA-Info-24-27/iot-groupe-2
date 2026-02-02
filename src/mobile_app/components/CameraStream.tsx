@@ -1,100 +1,120 @@
-// components/CameraStream.tsx
-import React, { useState } from 'react';
-import { View, StyleSheet, ActivityIndicator, Text } from 'react-native';
-import { Image } from 'expo-image';
-import { API_ENDPOINTS } from '@/constants/config';
+import React, { useMemo, useState } from "react";
+import { ActivityIndicator, StyleProp, StyleSheet, Text, View, ViewStyle } from "react-native";
+import { WebView } from "react-native-webview";
+import { useAppTheme } from "@/constants/theme";
 
-export const CameraStream: React.FC = () => {
+type CameraStreamProps = {
+  streamUrl: string;
+  style?: StyleProp<ViewStyle>;
+  onErrorChange?: (message: string | null) => void;
+};
+
+export const CameraStream: React.FC<CameraStreamProps> = ({ streamUrl, style, onErrorChange }) => {
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-  const [key, setKey] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleLoad = () => {
-    setLoading(false);
-    setError(false);
-  };
-
-  const handleError = () => {
-    setLoading(false);
-    setError(true);
-    setTimeout(() => {
-      setKey(prev => prev + 1);
-      setLoading(true);
-      setError(false);
-    }, 5000);
-  };
+  const htmlContent = useMemo(
+    () => `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body, html { width: 100%; height: 100%; background: #000; overflow: hidden; }
+            #wrap { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+            img { width: 100%; height: 100%; object-fit: cover; display: block; }
+            #error { display: none; color: #fff; font-family: -apple-system, Arial, sans-serif; }
+          </style>
+        </head>
+        <body>
+          <div id="wrap">
+            <img id="stream" src="${streamUrl}" alt="camera stream" />
+            <div id="error">Flux indisponible</div>
+          </div>
+          <script>
+            const img = document.getElementById('stream');
+            const error = document.getElementById('error');
+            img.onerror = () => {
+              img.style.display = 'none';
+              error.style.display = 'block';
+            };
+          </script>
+        </body>
+      </html>
+    `,
+    [streamUrl]
+  );
 
   return (
-    <View style={styles.container}>
-      {loading && (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#60a5fa" />
-          <Text style={styles.loadingText}>Connexion au flux caméra...</Text>
-        </View>
-      )}
-
-      {error && (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorIcon}>📹</Text>
-          <Text style={styles.errorText}>Impossible de charger le flux</Text>
-          <Text style={styles.errorSubtext}>Nouvelle tentative dans 5s...</Text>
-        </View>
-      )}
-
-  <Image
-        key={key}
-        source={{ uri: API_ENDPOINTS.cameraStream }}
-        style={styles.stream}
-        contentFit="contain"
-        onLoad={handleLoad}
-        onError={handleError}
-        cachePolicy="none"
+    <View style={[styles.container, style]}>
+      <WebView
+        source={{ html: htmlContent }}
+        style={styles.webview}
+        originWhitelist={["*"]}
+        allowsInlineMediaPlayback
+        javaScriptEnabled
+        domStorageEnabled={false}
+        scrollEnabled={false}
+        cacheEnabled={false}
+        onLoadStart={() => {
+          setLoading(true);
+          setError(null);
+          onErrorChange?.(null);
+        }}
+        onLoadEnd={() => {
+          setLoading(false);
+        }}
+        onError={() => {
+          setLoading(false);
+          const message = "Erreur lors du chargement du flux";
+          setError(message);
+          onErrorChange?.(message);
+        }}
       />
+
+      {loading && (
+        <View style={styles.overlay}>
+          <ActivityIndicator size="large" color={theme.colors.accent} />
+          <Text style={styles.overlayText}>Connexion au flux vidéo…</Text>
+        </View>
+      )}
+
+      {error && !loading && (
+        <View style={styles.overlay}>
+          <Text style={styles.overlayText}>{error}</Text>
+        </View>
+      )}
     </View>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#111827',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  stream: {
-    width: '100%',
-    height: '100%',
-  },
-  loadingContainer: {
-    position: 'absolute',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 10,
-  },
-  loadingText: {
-    color: '#9ca3af',
-    marginTop: 16,
-    fontSize: 14,
-  },
-  errorContainer: {
-    position: 'absolute',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 10,
-    padding: 20,
-  },
-  errorIcon: {
-    fontSize: 48,
-    marginBottom: 12,
-  },
-  errorText: {
-    color: '#ef4444',
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  errorSubtext: {
-    color: '#9ca3af',
-    fontSize: 12,
-  },
-});
+const getStyles = (theme: ReturnType<typeof useAppTheme>) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: "#000",
+      borderRadius: 12,
+      overflow: "hidden",
+    },
+    webview: {
+      flex: 1,
+      backgroundColor: "#000",
+    },
+    overlay: {
+      ...StyleSheet.absoluteFillObject,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: "rgba(0, 0, 0, 0.5)",
+      padding: 16,
+    },
+    overlayText: {
+      marginTop: 12,
+      color: theme.colors.text,
+      fontSize: 13,
+      textAlign: "center",
+    },
+  });

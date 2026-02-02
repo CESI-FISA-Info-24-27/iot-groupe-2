@@ -13,12 +13,15 @@ import {
 import { SensorCard } from '@/components/SensorCard';
 import { useSensorData } from '@/hooks/useSensorData';
 import { SENSOR_CONFIGS } from '@/constants/config';
+import { useAppTheme } from '@/constants/theme';
 
 export default function DashboardScreen() {
   const { data, loading, error, refresh } = useSensorData();
   const [refreshing, setRefreshing] = React.useState(false);
   const { width } = useWindowDimensions();
   const isWide = width >= 720;
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -42,13 +45,17 @@ export default function DashboardScreen() {
 
   const status = overallStatus();
   const statusColor =
-    status === 'stable' ? '#22c55e' : status === 'partiel' ? '#f59e0b' : '#ef4444';
+    status === 'stable'
+      ? theme.colors.success
+      : status === 'partiel'
+        ? theme.colors.warning
+        : theme.colors.danger;
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerGlow} />
-        <Text style={styles.kicker}>EcoGuard 360</Text>
+        <Text style={styles.kicker}>CesIOT</Text>
         <Text style={styles.title}>Dashboard</Text>
         <Text style={styles.subtitle}>Surveillance environnementale en temps réel</Text>
         <View style={styles.headerRow}>
@@ -73,14 +80,14 @@ export default function DashboardScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="#60a5fa"
-            colors={['#60a5fa']}
+            tintColor={theme.colors.accent}
+            colors={[theme.colors.accent]}
           />
         }
       >
         {loading && !data.temperature && (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#60a5fa" />
+            <ActivityIndicator size="large" color={theme.colors.accent} />
             <Text style={styles.loadingText}>Chargement des données...</Text>
           </View>
         )}
@@ -122,16 +129,17 @@ export default function DashboardScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: ReturnType<typeof useAppTheme>) =>
+  StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0b1220',
+    backgroundColor: theme.colors.background,
   },
   header: {
     paddingHorizontal: 20,
     paddingTop: Platform.OS === 'ios' ? 64 : 40,
     paddingBottom: 20,
-    backgroundColor: '#0b1220',
+    backgroundColor: theme.colors.background,
     overflow: 'hidden',
   },
   headerGlow: {
@@ -141,20 +149,20 @@ const styles = StyleSheet.create({
     width: 240,
     height: 240,
     borderRadius: 999,
-    backgroundColor: '#0ea5e9',
-    opacity: 0.2,
+    backgroundColor: theme.colors.accent,
+    opacity: theme.isDark ? 0.2 : 0.12,
   },
   kicker: {
     fontSize: 12,
     letterSpacing: 1.6,
     textTransform: 'uppercase',
-    color: '#38bdf8',
+    color: theme.colors.accent,
     fontWeight: '700',
   },
   title: {
     fontSize: 30,
     fontWeight: '800',
-    color: '#f8fafc',
+    color: theme.colors.text,
     marginBottom: 4,
     fontFamily: Platform.select({
       ios: 'Avenir Next',
@@ -164,7 +172,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: theme.colors.textMuted,
   },
   headerRow: {
     flexDirection: 'row',
@@ -178,7 +186,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 999,
     borderWidth: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: theme.colors.surface,
     marginRight: 12,
   },
   statusDot: {
@@ -194,18 +202,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   timestamp: {
-    color: '#64748b',
+    color: theme.colors.textSubtle,
     fontSize: 12,
   },
   errorBanner: {
-    backgroundColor: '#7f1d1d',
+    backgroundColor: theme.colors.dangerBg,
     padding: 12,
     marginHorizontal: 16,
     marginTop: 8,
     borderRadius: 10,
   },
   errorText: {
-    color: '#fecaca',
+    color: theme.isDark ? '#fecaca' : theme.colors.danger,
     fontSize: 14,
     textAlign: 'center',
   },
@@ -220,7 +228,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    color: '#94a3b8',
+    color: theme.colors.textMuted,
     marginTop: 16,
     fontSize: 14,
   },
@@ -239,4 +247,4 @@ const styles = StyleSheet.create({
   cardHalf: {
     width: '48%',
   },
-});
+  });

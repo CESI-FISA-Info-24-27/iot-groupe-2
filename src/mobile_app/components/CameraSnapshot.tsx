@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Image, StyleProp, StyleSheet, Text, View, ViewStyle } from "react-native";
+import { useAppTheme } from "@/constants/theme";
 
 type StatusPayload = {
   ok: boolean;
@@ -40,6 +41,8 @@ export const CameraSnapshot: React.FC<CameraSnapshotProps> = ({
   style,
   onStatusChange,
 }) => {
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
   const [imageUrl, setImageUrl] = useState(() => appendCacheBuster(baseUrl, Date.now()));
   const [effectiveFps, setEffectiveFps] = useState(fps);
   const [consecutiveErrors, setConsecutiveErrors] = useState(0);
@@ -204,10 +207,11 @@ export const CameraSnapshot: React.FC<CameraSnapshotProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: ReturnType<typeof useAppTheme>) =>
+  StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000000",
+    backgroundColor: theme.colors.surface,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -222,11 +226,11 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 999,
-    backgroundColor: "rgba(0,0,0,0.6)",
+    backgroundColor: theme.isDark ? "rgba(0,0,0,0.6)" : "rgba(15,23,42,0.08)",
   },
   overlayText: {
-    color: "#f59e0b",
+    color: theme.colors.warning,
     fontSize: 12,
     fontWeight: "600",
   },
-});
+  });

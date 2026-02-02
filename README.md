@@ -1,8 +1,8 @@
-# 🌱 EcoGuard 360 — Système de Surveillance Hybride Edge IoT
+# 🌱 CesIOT — Système de Surveillance Hybride Edge IoT
 
 Projet réalisé dans le cadre du module **IoT – FISA A4 Informatique**.
 
-EcoGuard 360 est un **MVP de système de surveillance industriel hybride** combinant **sécurité physique** et **efficacité énergétique**, basé sur une architecture **Edge Computing Open Source**, résiliente et indépendante du cloud.
+CesIOT est un **MVP de système de surveillance industriel hybride** combinant **sécurité physique** et **efficacité énergétique**, basé sur une architecture **Edge Computing Open Source**, résiliente et indépendante du cloud.
 
 ---
 
@@ -182,4 +182,4 @@ Toute réutilisation industrielle nécessiterait une phase d’audit sécurité 
 
 ---
 
-🌱 **EcoGuard 360 — Edge Intelligence for Sustainable & Secure Buildings**
+🌱 **CesIOT — Edge Intelligence for Sustainable & Secure Buildings**

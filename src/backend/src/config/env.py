@@ -15,7 +15,7 @@ class MQTTSettings(BaseSettings):
 
 class InfluxSettings(BaseSettings):
     url: str = "http://localhost:8086"
-    org: str = "EcoGuard"
+    org: str = "CesIOT"
     bucket: str = "sensors"
     token: str = ""
 

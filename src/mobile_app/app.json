@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "mobile_app",
-    "slug": "mobile_app",
+    "name": "CesIOT",
+    "slug": "cesiot",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "mobileapp",
+    "scheme": "cesiot",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {

@@ -2,20 +2,14 @@
 import { SensorConfig } from "@/types/sensors";
 
 // À remplacer par l'adresse IP du serveur IoT quand on l'aura
-export const API_BASE_URL = "http://10.41.12.112:3000";
+export const API_BASE_URL = "http://172.20.10.2:3000";
 
 export const API_ENDPOINTS = {
   sensorsHistory: `${API_BASE_URL}/api/sensors/history`,
   health: `${API_BASE_URL}/health`,
   cameraSnapshot: `${API_BASE_URL}/api/camera/snapshot`,
   cameraStream: `${API_BASE_URL}/api/camera/stream`,
-  camera: `http://honjin1.miemasu.net/nphMotionJpeg?Resolution=640x480&Quality=Standard`, // Pour tester le flux caméra
-  cameraSnapshot: `${API_BASE_URL}/api/camera/snapshot`,
-  cameraStream: `${API_BASE_URL}/api/camera/stream`,
-  camera: `http://honjin1.miemasu.net/nphMotionJpeg?Resolution=640x480&Quality=Standard`, // Pour tester le flux caméra
-  cameraSnapshot: `${API_BASE_URL}/api/camera/snapshot`,
-  cameraStream: `${API_BASE_URL}/api/camera/stream`,
-  camera: `http://honjin1.miemasu.net/nphMotionJpeg?Resolution=640x480&Quality=Standard`, // Pour tester le flux caméra
+  camera: `http://172.20.10.3/snapshot`, // Snapshot caméra
 };
 
 // Configuration de chaque capteur

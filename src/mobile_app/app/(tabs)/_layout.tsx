@@ -1,19 +1,21 @@
 // app/(tabs)/_layout.tsx
 import { Tabs } from "expo-router";
 import React from "react";
-import { Platform, StyleSheet, Text } from "react-native";
+import { Platform, StyleSheet } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useAppTheme } from "@/constants/theme";
 
 export default function TabLayout() {
+  const theme = useAppTheme();
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: "#60a5fa",
-        tabBarInactiveTintColor: "#6b7280",
+        tabBarActiveTintColor: theme.colors.accent,
+        tabBarInactiveTintColor: theme.colors.textSubtle,
         tabBarStyle: {
-          backgroundColor: "#1f2937",
-          borderTopColor: "#374151",
+          backgroundColor: theme.colors.tabBarBackground,
+          borderTopColor: theme.colors.tabBarBorder,
           borderTopWidth: 1,
           height: Platform.OS === "ios" ? 90 : 60,
           paddingBottom: Platform.OS === "ios" ? 30 : 10,
@@ -52,6 +54,15 @@ export default function TabLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: "Réglages",
+          tabBarIcon: ({ color, size }) => (
+            <TabBarIcon name="cog" color={color} size={size} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }
@@ -71,7 +82,7 @@ function TabBarIcon({
       name={name}
       color={color}
       size={Math.min(size + 2, 26)}
-      style={[styles.tabIcon, { opacity: color === "#60a5fa" ? 1 : 0.6 }]}
+      style={[styles.tabIcon, { opacity: 0.9 }]}
     />
   );
 }

@@ -3,6 +3,7 @@ import React from 'react';
 import { Platform, View, Text, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SensorConfig } from '@/types/sensors';
+import { useAppTheme } from '@/constants/theme';
 
 interface SensorCardProps {
   config: SensorConfig;
@@ -11,6 +12,8 @@ interface SensorCardProps {
 }
 
 export const SensorCard: React.FC<SensorCardProps> = ({ config, value, timestamp }) => {
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
   const getStatus = () => {
     if (value === null) return 'offline';
     if (config.criticalThreshold && value >= config.criticalThreshold) return 'critical';
@@ -20,10 +23,10 @@ export const SensorCard: React.FC<SensorCardProps> = ({ config, value, timestamp
 
   const status = getStatus();
   const statusColors = {
-    normal: '#10b981',
-    warning: '#f59e0b',
-    critical: '#ef4444',
-    offline: '#6b7280',
+    normal: theme.colors.success,
+    warning: theme.colors.warning,
+    critical: theme.colors.danger,
+    offline: theme.colors.textSubtle,
   };
 
   const getLastUpdate = () => {
@@ -40,12 +43,12 @@ export const SensorCard: React.FC<SensorCardProps> = ({ config, value, timestamp
       <MaterialCommunityIcons
         name={config.icon}
         size={48}
-        color="#ffffff"
+        color={theme.colors.text}
         style={styles.watermark}
       />
       <View style={styles.header}>
         <View style={styles.iconWrap}>
-          <MaterialCommunityIcons name={config.icon} size={22} color="#e2e8f0" />
+          <MaterialCommunityIcons name={config.icon} size={22} color={theme.colors.text} />
         </View>
         <View style={styles.headerText}>
           <Text style={styles.name}>{config.name}</Text>
@@ -56,7 +59,6 @@ export const SensorCard: React.FC<SensorCardProps> = ({ config, value, timestamp
           </View>
         </View>
       </View>
-
       <View style={styles.valueContainer}>
         {value === null ? (
           <Text style={styles.offline}>Hors ligne</Text>
@@ -76,15 +78,16 @@ export const SensorCard: React.FC<SensorCardProps> = ({ config, value, timestamp
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: ReturnType<typeof useAppTheme>) =>
+  StyleSheet.create({
   card: {
-    backgroundColor: '#0f172a',
+    backgroundColor: theme.colors.surface,
     borderRadius: 20,
     padding: 18,
     borderWidth: 1,
-    shadowColor: '#0b1220',
+    shadowColor: theme.colors.text,
     shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.2,
+    shadowOpacity: theme.isDark ? 0.2 : 0.08,
     shadowRadius: 18,
     elevation: 4,
     overflow: 'hidden',
@@ -113,7 +116,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 14,
-    backgroundColor: '#111827',
+    backgroundColor: theme.colors.surfaceAlt,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -127,7 +130,7 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#e2e8f0',
+    color: theme.colors.text,
     fontFamily: Platform.select({
       ios: 'Avenir Next',
       android: 'sans-serif-medium',
@@ -155,7 +158,7 @@ const styles = StyleSheet.create({
   value: {
     fontSize: 36,
     fontWeight: 'bold',
-    color: '#f8fafc',
+    color: theme.colors.text,
     fontFamily: Platform.select({
       ios: 'Avenir Next',
       android: 'sans-serif',
@@ -164,12 +167,12 @@ const styles = StyleSheet.create({
   },
   unit: {
     fontSize: 18,
-    color: '#94a3b8',
+    color: theme.colors.textMuted,
     marginLeft: 6,
   },
   offline: {
     fontSize: 18,
-    color: '#64748b',
+    color: theme.colors.textSubtle,
     fontStyle: 'italic',
   },
   footer: {
@@ -184,6 +187,6 @@ const styles = StyleSheet.create({
   },
   lastUpdate: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: theme.colors.textMuted,
   },
-});
+  });

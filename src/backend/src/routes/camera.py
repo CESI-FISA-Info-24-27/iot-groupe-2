@@ -9,31 +9,23 @@ from urllib.error import URLError, HTTPError
 router = APIRouter(prefix="/api/camera", tags=["camera"])
 logger = logging.getLogger("camera")
 
-DEFAULT_MJPEG_URL = "http://honjin1.miemasu.net/nphMotionJpeg?Resolution=640x480&Quality=Standard"
+DEFAULT_SNAPSHOT_URL = "http://172.20.10.3/snapshot"
+DEFAULT_STREAM_URL = "http://172.20.10.3/stream"
 _cache_lock = Lock()
 _last_frame = None
 _last_ts = 0.0
 
 
-def _read_mjpeg_frame(stream, max_bytes: int = 2_000_000) -> bytes:
-    start = b"\xff\xd8"
-    end = b"\xff\xd9"
-    data = b""
-    while len(data) < max_bytes:
-        chunk = stream.read(4096)
-        if not chunk:
-            break
-        data += chunk
-        start_idx = data.find(start)
-        if start_idx != -1:
-            end_idx = data.find(end, start_idx + 2)
-            if end_idx != -1:
-                return data[start_idx : end_idx + 2]
-    raise ValueError("No JPEG frame found")
+@router.head("/snapshot")
+def snapshot_head():
+    with _cache_lock:
+        if _last_frame is not None and (time.time() - _last_ts) < 2.0:
+            return Response(status_code=200, headers={"X-Cache": "hit"})
+    return Response(status_code=204, headers={"X-Cache": "miss"})
 
 
 @router.get("/snapshot")
-def snapshot(url: str = Query(DEFAULT_MJPEG_URL)):
+def snapshot(url: str = Query(DEFAULT_SNAPSHOT_URL)):
     global _last_frame, _last_ts
 
     logger.info("snapshot requested url=%s", url)
@@ -44,20 +36,26 @@ def snapshot(url: str = Query(DEFAULT_MJPEG_URL)):
 
     headers = {
         "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
-        "Accept": "multipart/x-mixed-replace,image/jpeg,*/*",
+        "Accept": "image/jpeg,*/*",
+        "Cache-Control": "no-cache",
     }
 
     for _ in range(2):
         try:
             request = Request(url, headers=headers)
-            with urlopen(request, timeout=8) as response:
-                frame = _read_mjpeg_frame(response)
+            with urlopen(request, timeout=12) as response:
+                frame = response.read()
+                content_type = response.headers.get("Content-Type", "image/jpeg")
+            if not frame:
+                raise ValueError("Empty snapshot response")
             with _cache_lock:
                 _last_frame = frame
                 _last_ts = time.time()
             logger.info("snapshot cache=miss size=%d", len(frame))
-            return Response(content=frame, media_type="image/jpeg", headers={"X-Cache": "miss"})
-        except (HTTPError, URLError, TimeoutError, ValueError):
+            media_type = content_type if content_type.startswith("image/") else "image/jpeg"
+            return Response(content=frame, media_type=media_type, headers={"X-Cache": "miss"})
+        except (HTTPError, URLError, TimeoutError, ValueError) as exc:
+            logger.warning("snapshot upstream error url=%s err=%s", url, repr(exc))
             continue
 
     with _cache_lock:
@@ -81,7 +79,7 @@ def _iter_mjpeg_stream(response, chunk_size: int = 4096):
 
 
 @router.get("/stream")
-def stream(url: str = Query(DEFAULT_MJPEG_URL)):
+def stream(url: str = Query(DEFAULT_STREAM_URL)):
     logger.info("stream requested url=%s", url)
     headers = {
         "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
