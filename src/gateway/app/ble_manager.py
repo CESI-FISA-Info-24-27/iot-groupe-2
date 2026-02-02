@@ -156,7 +156,7 @@ class BLEManager:
                 disconnect_event.set()
 
             try:
-                device = await self._find_device_group(sensors)
+                device = await self._resolve_device_group(sensors)
                 if not device:
                     print(f"[BLE] Groupe {key} non trouvé, nouvel essai dans {self._config.scan_interval}s")
                     await asyncio.sleep(self._config.scan_interval)
@@ -329,6 +329,12 @@ class BLEManager:
             if device.name and device.name in wanted_names:
                 return device
         return None
+
+    async def _resolve_device_group(self, sensors: List[BleSensorConfig]):
+        for sensor in sensors:
+            if sensor.address:
+                return sensor.address
+        return await self._find_device_group(sensors)
 
     def _device_key(self, sensor: BleSensorConfig) -> str:
         if sensor.address:
