@@ -5,6 +5,13 @@ from typing import List, Optional
 from dotenv import load_dotenv
 import yaml
 
+DEFAULT_BLE_DEVICE_NAME = "ESP32_Capteurs"
+DEFAULT_BLE_SENSOR_ID = "ble-ecoguard"
+DEFAULT_BLE_ROOM = "C4"
+DEFAULT_BLE_READ_INTERVAL = 1.0
+DEFAULT_BLE_JSON_CHAR_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8"
+DEFAULT_BLE_COMMAND_CHAR_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a9"
+
 
 @dataclass(frozen=True)
 class MqttConfig:
@@ -158,24 +165,101 @@ def _mqtt_from_yaml(raw: Optional[dict]) -> Optional[MqttConfig]:
 
 
 def _sensors_from_env() -> List[BleSensorConfig]:
-    # Construction explicite des capteurs à partir des variables d'environnement
     sensors = []
-    # Mode "JSON" (un seul service / une seule caractéristique)
-    json_uuid = os.environ.get("BLE_JSON_CHAR_UUID")
-    if json_uuid:
+    force_json = _parse_bool(os.environ.get("BLE_FORCE_JSON"), default=True)
+    if force_json:
         sensors.append(BleSensorConfig(
-            sensor_id=os.environ.get("BLE_SENSOR_ID", "ble-ecoguard"),
-            room=os.environ.get("BLE_ROOM", "C4"),
-            name=os.environ.get("BLE_DEVICE_NAME", "ESP32_Capteurs"),
+            sensor_id=os.environ.get("BLE_SENSOR_ID", DEFAULT_BLE_SENSOR_ID),
+            room=os.environ.get("BLE_ROOM", DEFAULT_BLE_ROOM),
+            name=os.environ.get("BLE_DEVICE_NAME", DEFAULT_BLE_DEVICE_NAME),
             address=os.environ.get("BLE_DEVICE_ADDRESS") or None,
-            telemetry_uuid=json_uuid,
-            command_uuid=os.environ.get("BLE_COMMAND_CHAR_UUID") or None,
+            telemetry_uuid=os.environ.get("BLE_JSON_CHAR_UUID", DEFAULT_BLE_JSON_CHAR_UUID),
+            command_uuid=os.environ.get("BLE_COMMAND_CHAR_UUID", DEFAULT_BLE_COMMAND_CHAR_UUID),
             mode="notify",
-            read_interval=float(os.environ.get("BLE_READ_INTERVAL", "1.0")),
+            read_interval=float(os.environ.get("BLE_READ_INTERVAL", str(DEFAULT_BLE_READ_INTERVAL))),
             metric="json",
             simulated=False,
         ))
         return sensors
+
+    # Mode "JSON" (un seul service / une seule caracteristique)
+    json_uuid = os.environ.get("BLE_JSON_CHAR_UUID")
+    if json_uuid:
+        sensors.append(BleSensorConfig(
+            sensor_id=os.environ.get("BLE_SENSOR_ID", DEFAULT_BLE_SENSOR_ID),
+            room=os.environ.get("BLE_ROOM", DEFAULT_BLE_ROOM),
+            name=os.environ.get("BLE_DEVICE_NAME", DEFAULT_BLE_DEVICE_NAME),
+            address=os.environ.get("BLE_DEVICE_ADDRESS") or None,
+            telemetry_uuid=json_uuid,
+            command_uuid=os.environ.get("BLE_COMMAND_CHAR_UUID") or None,
+            mode="notify",
+            read_interval=float(os.environ.get("BLE_READ_INTERVAL", str(DEFAULT_BLE_READ_INTERVAL))),
+            metric="json",
+            simulated=False,
+        ))
+        return sensors
+
+    # Temperature
+    temp_uuid = os.environ.get("CHAR_TEMP_UUID")
+    if temp_uuid:
+        sensors.append(BleSensorConfig(
+            sensor_id="ble-temp",
+            room=DEFAULT_BLE_ROOM,
+            name=DEFAULT_BLE_DEVICE_NAME,
+            address=None,
+            telemetry_uuid=temp_uuid,
+            command_uuid=None,
+            mode="notify",
+            read_interval=2.0,
+            metric="temperature",
+            simulated=False,
+        ))
+    # Pression
+    press_uuid = os.environ.get("CHAR_PRESSURE_UUID")
+    if press_uuid:
+        sensors.append(BleSensorConfig(
+            sensor_id="ble-press",
+            room=DEFAULT_BLE_ROOM,
+            name=DEFAULT_BLE_DEVICE_NAME,
+            address=None,
+            telemetry_uuid=press_uuid,
+            command_uuid=None,
+            mode="notify",
+            read_interval=2.0,
+            metric="pressure",
+            simulated=False,
+        ))
+    # Son
+    sound_uuid = os.environ.get("CHAR_SOUND_UUID")
+    if sound_uuid:
+        sensors.append(BleSensorConfig(
+            sensor_id="ble-son",
+            room=DEFAULT_BLE_ROOM,
+            name=DEFAULT_BLE_DEVICE_NAME,
+            address=None,
+            telemetry_uuid=sound_uuid,
+            command_uuid=None,
+            mode="notify",
+            read_interval=2.0,
+            metric="sound",
+            simulated=False,
+        ))
+    # Distance
+    dist_uuid = os.environ.get("CHAR_DISTANCE_UUID")
+    if dist_uuid:
+        sensors.append(BleSensorConfig(
+            sensor_id="ble-dist",
+            room=DEFAULT_BLE_ROOM,
+            name=DEFAULT_BLE_DEVICE_NAME,
+            address=None,
+            telemetry_uuid=dist_uuid,
+            command_uuid=None,
+            mode="notify",
+            read_interval=2.0,
+            metric="distance",
+            simulated=False,
+        ))
+    return sensors
 
     # Température
     temp_uuid = os.environ.get("CHAR_TEMP_UUID")
