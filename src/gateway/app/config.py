@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import List, Optional
 
 from dotenv import load_dotenv
+import yaml
 
 
 @dataclass(frozen=True)
@@ -101,6 +102,61 @@ def _default_simulated_sensors() -> List[BleSensorConfig]:
     ]
 
 
+def _load_yaml_config(path: str) -> Optional[dict]:
+    try:
+        if not path or not os.path.exists(path):
+            return None
+        with open(path, "r", encoding="utf-8") as handle:
+            return yaml.safe_load(handle) or {}
+    except Exception:
+        return None
+
+
+def _sensors_from_yaml(raw: Optional[dict]) -> List[BleSensorConfig]:
+    if not raw:
+        return []
+    ble = raw.get("ble") or {}
+    sensors_raw = ble.get("sensors") or []
+    sensors: List[BleSensorConfig] = []
+    for entry in sensors_raw:
+        if not isinstance(entry, dict):
+            continue
+        sensors.append(
+            BleSensorConfig(
+                sensor_id=str(entry.get("sensor_id", "ble-ecoguard")),
+                room=str(entry.get("room", "C4")),
+                name=entry.get("name") or None,
+                address=entry.get("address") or None,
+                telemetry_uuid=entry.get("telemetry_uuid") or None,
+                command_uuid=entry.get("command_uuid") or None,
+                mode=str(entry.get("mode", "notify")).lower(),
+                read_interval=float(entry.get("read_interval", 2.0)),
+                metric=str(entry.get("metric", "temperature")),
+                simulated=bool(entry.get("simulated", False)),
+            )
+        )
+    return sensors
+
+
+def _mqtt_from_yaml(raw: Optional[dict]) -> Optional[MqttConfig]:
+    if not raw:
+        return None
+    mqtt_raw = raw.get("mqtt") or {}
+    broker = mqtt_raw.get("broker")
+    port = mqtt_raw.get("port")
+    if not broker or not port:
+        return None
+    return MqttConfig(
+        host=str(broker),
+        port=int(port),
+        username=mqtt_raw.get("username") or None,
+        password=mqtt_raw.get("password") or None,
+        tls=_parse_bool(str(mqtt_raw.get("tls", "false")), default=False),
+        tls_ca=mqtt_raw.get("tls_ca") or None,
+        tls_insecure=_parse_bool(str(mqtt_raw.get("tls_insecure", "false")), default=False),
+    )
+
+
 def _sensors_from_env() -> List[BleSensorConfig]:
     # Construction explicite des capteurs à partir des variables d'environnement
     sensors = []
@@ -186,21 +242,34 @@ def _sensors_from_env() -> List[BleSensorConfig]:
 def load_config() -> AppConfig:
     load_dotenv()
 
-    mqtt = MqttConfig(
-        host=os.environ.get("MQTT_BROKER_HOST", "localhost"),
-        port=int(os.environ.get("MQTT_BROKER_PORT", "1883")),
-        username=os.environ.get("MQTT_BROKER_USERNAME") or None,
-        password=os.environ.get("MQTT_BROKER_PASSWORD") or None,
-        tls=_parse_bool(os.environ.get("MQTT_TLS"), default=False),
-        tls_ca=os.environ.get("MQTT_TLS_CA") or None,
-        tls_insecure=_parse_bool(os.environ.get("MQTT_TLS_INSECURE"), default=False),
-    )
+    config_file = os.environ.get("CONFIG_FILE") or os.environ.get("BRIDGE_BLE_MQTT_CONFIG_FILE")
+    yaml_config = _load_yaml_config(config_file) if config_file else None
+
+    mqtt = _mqtt_from_yaml(yaml_config) if yaml_config else None
+    if mqtt is None:
+        mqtt = MqttConfig(
+            host=os.environ.get("MQTT_BROKER_HOST", "localhost"),
+            port=int(os.environ.get("MQTT_BROKER_PORT", "1883")),
+            username=os.environ.get("MQTT_BROKER_USERNAME") or None,
+            password=os.environ.get("MQTT_BROKER_PASSWORD") or None,
+            tls=_parse_bool(os.environ.get("MQTT_TLS"), default=False),
+            tls_ca=os.environ.get("MQTT_TLS_CA") or None,
+            tls_insecure=_parse_bool(os.environ.get("MQTT_TLS_INSECURE"), default=False),
+        )
 
     scan_interval = float(os.environ.get("BLE_SCAN_INTERVAL", "5"))
     reconnect_delay = float(os.environ.get("BLE_RECONNECT_DELAY", "5"))
+    if yaml_config:
+        ble_yaml = yaml_config.get("ble") or {}
+        if "scan_interval" in ble_yaml:
+            scan_interval = float(ble_yaml.get("scan_interval", scan_interval))
+        if "reconnect_delay" in ble_yaml:
+            reconnect_delay = float(ble_yaml.get("reconnect_delay", reconnect_delay))
 
     # Capteurs BLE depuis les variables d'environnement explicites
     sensors = _sensors_from_env()
+    if not sensors and yaml_config:
+        sensors = _sensors_from_yaml(yaml_config)
     if not sensors:
         # fallback : BLE_SENSORS (format compact)
         sensors_raw = os.environ.get("BLE_SENSORS", "")
