@@ -97,7 +97,14 @@ from(bucket: "{settings.influx.bucket}")
         if not self.write_api:
             return
 
-        timestamp = ts if ts and isinstance(ts, (int, float)) else int(datetime.now().timestamp() * 1000)
+        now_ms = int(datetime.now().timestamp() * 1000)
+        timestamp = now_ms
+        if ts and isinstance(ts, (int, float)):
+            ts_int = int(ts)
+            if ts_int >= 1_000_000_000_000:
+                timestamp = ts_int
+            elif ts_int >= 1_600_000_000:
+                timestamp = ts_int * 1000
 
         point = (
             Point("telemetry")
