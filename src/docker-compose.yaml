@@ -58,37 +58,13 @@ services:
   gateway: # Bridge BLE-MQTT
     build: ./gateway
     container_name: gateway
-    privileged: true
-    devices:
-      - /dev/hci0:/dev/hci0
-    volumes:
-      - /run/dbus:/run/dbus
-      - /etc/machine-id:/etc/machine-id:ro
-      - ./gateway/config:/app/config
     environment:
       - PYTHONUNBUFFERED=1
-      - CONFIG_FILE=${BRIDGE_BLE_MQTT_CONFIG_FILE:?BRIDGE_BLE_MQTT_CONFIG_FILE manquant}
-      - MQTT_BROKER_HOST=localhost
+      - MQTT_BROKER_HOST=mqtt-broker
       - MQTT_BROKER_PORT=${MQTT_BROKER_DEST_PORT:?MQTT_BROKER_DEST_PORT manquant}
       - MQTT_BROKER_USERNAME=${MQTT_BROKER_USERNAME:?MQTT_BROKER_USERNAME manquant}
       - MQTT_BROKER_PASSWORD=${MQTT_BROKER_PASSWORD:?MQTT_BROKER_PASSWORD manquant}
-      - BLE_JSON_CHAR_UUID=${BLE_JSON_CHAR_UUID:-}
-      - BLE_COMMAND_CHAR_UUID=${BLE_COMMAND_CHAR_UUID:-}
-      - BLE_DEVICE_NAME=${BLE_DEVICE_NAME:-}
-      - BLE_DEVICE_ADDRESS=${BLE_DEVICE_ADDRESS:-}
-      - BLE_SENSOR_ID=${BLE_SENSOR_ID:-}
-      - BLE_ROOM=${BLE_ROOM:-}
-      - BLE_READ_INTERVAL=${BLE_READ_INTERVAL:-}
-      - SERVICE_TEMPERATURE_UUID=${SERVICE_TEMPERATURE_UUID:-}
-      - CHAR_TEMP_UUID=${CHAR_TEMP_UUID:-}
-      - SERVICE_PRESSURE_UUID=${SERVICE_PRESSURE_UUID:-}
-      - CHAR_PRESSURE_UUID=${CHAR_PRESSURE_UUID:-}
-      - SERVICE_SOUND_UUID=${SERVICE_SOUND_UUID:-}
-      - CHAR_SOUND_UUID=${CHAR_SOUND_UUID:-}
-      - SERVICE_DISTANCE_UUID=${SERVICE_DISTANCE_UUID:-}
-      - CHAR_DISTANCE_UUID=${CHAR_DISTANCE_UUID:-}
     restart: unless-stopped
-    network_mode: "host"
     depends_on:
       mqtt-broker:
         condition: service_healthy

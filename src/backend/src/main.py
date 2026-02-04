@@ -65,7 +65,53 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"Failed to write telemetry to InfluxDB: {e}")
 
-    mqtt_service.subscribe("sensors/+/telemetry", handle_telemetry)
+    def handle_ecoguard(topic: str, payload: Dict[str, Any], raw_message: str):
+        data = payload
+
+        if not data or not isinstance(data, dict):
+            try:
+                data = json.loads(raw_message)
+            except json.JSONDecodeError as e:
+                if settings.debug:
+                    print(f"MQTT ecoguard payload invalid JSON: {topic}, {e}")
+                return
+
+        room = data.get("room_id") or data.get("room")
+        sensor_id = data.get("device_id") or data.get("sensor_id") or data.get("parent_device_id")
+        metric = data.get("sensor_type") or data.get("metric")
+        value = data.get("value", data.get("amplitude"))
+        ts = data.get("timestamp") or data.get("ts")
+
+        if not all([room, sensor_id, metric]) or value is None:
+            if settings.debug:
+                print(f"MQTT ecoguard payload missing fields: {topic}, {data}")
+            return
+
+        try:
+            value_number = float(value)
+        except (TypeError, ValueError):
+            if settings.debug:
+                print(f"Invalid value in ecoguard payload: {value}")
+            return
+
+        try:
+            influx_service.write_telemetry(
+                room=room,
+                sensor_id=sensor_id,
+                metric=metric,
+                value=value_number,
+                ts=ts
+            )
+            if settings.debug:
+                print(f"Ecoguard telemetry written to InfluxDB: {topic}, {room}, {sensor_id}, {metric}, {value_number}")
+        except Exception as e:
+            print(f"Failed to write ecoguard telemetry to InfluxDB: {e}")
+
+    source = (settings.mqtt_telemetry_source or "telemetry").lower()
+    if source in {"telemetry", "both"}:
+        mqtt_service.subscribe("sensors/+/telemetry", handle_telemetry)
+    if source in {"ecoguard", "both"}:
+        mqtt_service.subscribe("ecoguard/sensors/+/+", handle_ecoguard)
     
     print(f"✓ CesIOT API listening on port {settings.port}")
     

@@ -1,17 +1,17 @@
-#include <BLEDevice.h>
-#include <BLEServer.h>
-#include <BLEUtils.h>
-#include <BLE2902.h>
-
 #include <SPI.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BMP280.h>
+#include <WiFi.h>
+#include <PubSubClient.h>
 
-// ===== CONFIGURATION BLE =====
-#define DEVICE_NAME "ESP32_Capteurs"
-#define SERVICE_UUID "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
-#define CHAR_TX_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"  // ESP32 -> Gateway (notify)
-#define CHAR_RX_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a9"  // Gateway -> ESP32 (write)
+// ===== CONFIGURATION WIFI / MQTT =====
+// Renseigne ici tes paramètres réseau et MQTT
+const char* WIFI_SSID = "Iphone13NRV";
+const char* WIFI_PASSWORD = "cesiot-0102";
+const char* MQTT_HOST = "172.20.10.10";
+const int MQTT_PORT = 1883;
+const char* MQTT_USERNAME = "ecoguard";
+const char* MQTT_PASSWORD = "ecoguard123";
 
 // ===== CONFIGURATION PROJET =====
 const char* room_id = "C4";
@@ -20,44 +20,10 @@ const char* sensor_id_bmp280 = "bmp280";
 const char* sensor_id_hcsr04 = "hcsr04";
 const char* sensor_id_mic = "mic";
 
-// ===== ÉTAT BLE =====
-BLEServer* pServer = nullptr;
-BLECharacteristic* pTxCharacteristic = nullptr;
-BLECharacteristic* pRxCharacteristic = nullptr;
-bool deviceConnected = false;
-bool oldDeviceConnected = false;
+// ===== MQTT =====
+WiFiClient wifiClient;
+PubSubClient mqttClient(wifiClient);
 bool is_awake = true;
-unsigned long last_awake_time = 0;
-
-// Callback BLE
-class MyServerCallbacks : public BLEServerCallbacks {
-  void onConnect(BLEServer* pServer) override {
-    deviceConnected = true;
-    BLEDevice::getAdvertising()->stop();
-  }
-  void onDisconnect(BLEServer* pServer) override {
-    deviceConnected = false;
-    BLEDevice::getAdvertising()->start();
-  }
-};
-
-class RxCallbacks : public BLECharacteristicCallbacks {
-  void onWrite(BLECharacteristic* pCharacteristic) override {
-    String rx = pCharacteristic->getValue().c_str();
-    if (rx.length() == 0) {
-      return;
-    }
-    if (rx.indexOf("\"command\":\"wake\"") != -1) {
-      is_awake = true;
-      last_awake_time = millis();
-    } else if (rx.indexOf("\"command\":\"sleep\"") != -1) {
-      is_awake = false;
-    } else if (rx.indexOf("\"command\":\"reboot\"") != -1) {
-      delay(200);
-      ESP.restart();
-    }
-  }
-};
 
 // ---------- BMP280 ----------
 #define BMP_CS   4
@@ -75,11 +41,31 @@ class RxCallbacks : public BLECharacteristicCallbacks {
 
 Adafruit_BMP280 bmp(BMP_CS, BMP_SDI, BMP_SDO, BMP_SCK);
 
-static void sendBLEMessage(const String& message) {
-  if (deviceConnected && pTxCharacteristic != nullptr) {
-    pTxCharacteristic->setValue(message.c_str());
-    pTxCharacteristic->notify();
+static void ensureWiFi() {
+  if (WiFi.status() == WL_CONNECTED) {
+    return;
   }
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+  }
+}
+
+static void ensureMQTT() {
+  if (mqttClient.connected()) {
+    return;
+  }
+  while (!mqttClient.connected()) {
+    if (mqttClient.connect(device_id, MQTT_USERNAME, MQTT_PASSWORD)) {
+      break;
+    }
+    delay(1000);
+  }
+}
+
+static void publishJSON(const char* topic, const char* payload) {
+  mqttClient.publish(topic, payload, true);
 }
 
 void setup() {
@@ -103,33 +89,11 @@ void setup() {
   pinMode(TRIG_PIN, OUTPUT);
   pinMode(ECHO_PIN, INPUT);
 
-  // BLE
-  BLEDevice::init(DEVICE_NAME);
-  pServer = BLEDevice::createServer();
-  pServer->setCallbacks(new MyServerCallbacks());
-
-  BLEService* pService = pServer->createService(SERVICE_UUID);
-  pTxCharacteristic = pService->createCharacteristic(
-    CHAR_TX_UUID,
-    BLECharacteristic::PROPERTY_NOTIFY
-  );
-  pTxCharacteristic->addDescriptor(new BLE2902());
-
-  pRxCharacteristic = pService->createCharacteristic(
-    CHAR_RX_UUID,
-    BLECharacteristic::PROPERTY_WRITE
-  );
-  pRxCharacteristic->setCallbacks(new RxCallbacks());
-
-  pService->start();
-
-  BLEAdvertising* pAdvertising = BLEDevice::getAdvertising();
-  pAdvertising->addServiceUUID(SERVICE_UUID);
-  pAdvertising->setScanResponse(true);
-  pAdvertising->setMinPreferred(0x06);
-  pAdvertising->setMaxPreferred(0x12);
-  BLEDevice::startAdvertising();
-  Serial.println("[BLE] Publicité BLE lancée, serveur prêt !");
+  // Wi-Fi + MQTT
+  ensureWiFi();
+  mqttClient.setServer(MQTT_HOST, MQTT_PORT);
+  ensureMQTT();
+  Serial.println("[MQTT] Connexion MQTT établie !");
 }
 
 float lireDistanceCM() 
@@ -148,14 +112,9 @@ float lireDistanceCM()
 
 void loop() 
 {
-  if (!deviceConnected && oldDeviceConnected) {
-    delay(500);
-    pServer->startAdvertising();
-    oldDeviceConnected = deviceConnected;
-  }
-  if (deviceConnected && !oldDeviceConnected) {
-    oldDeviceConnected = deviceConnected;
-  }
+  ensureWiFi();
+  ensureMQTT();
+  mqttClient.loop();
 
   if (!is_awake) {
     delay(100);
@@ -180,9 +139,10 @@ void loop()
   // ---------- HC-SR04 ----------
   float distance = lireDistanceCM();
 
-  // ---------- BLE ENVOI (JSON sur une seule caractéristique) ----------
+  // ---------- MQTT ENVOI (JSON par type) ----------
   unsigned long timestamp = millis();
   char json_msg[256];
+  char topic[128];
 
   snprintf(
     json_msg,
@@ -191,7 +151,8 @@ void loop()
     "\"sensor_type\":\"temperature\",\"value\":%.2f,\"unit\":\"C\",\"timestamp\":%lu}",
     sensor_id_bmp280, device_id, room_id, temp, timestamp
   );
-  sendBLEMessage(String(json_msg));
+  snprintf(topic, sizeof(topic), "ecoguard/sensors/%s/temperature", room_id);
+  publishJSON(topic, json_msg);
 
   snprintf(
     json_msg,
@@ -200,7 +161,8 @@ void loop()
     "\"sensor_type\":\"pressure\",\"value\":%.2f,\"unit\":\"hPa\",\"timestamp\":%lu}",
     sensor_id_bmp280, device_id, room_id, press, timestamp
   );
-  sendBLEMessage(String(json_msg));
+  snprintf(topic, sizeof(topic), "ecoguard/sensors/%s/pressure", room_id);
+  publishJSON(topic, json_msg);
 
   snprintf(
     json_msg,
@@ -209,7 +171,8 @@ void loop()
     "\"sensor_type\":\"sound\",\"amplitude\":%d,\"timestamp\":%lu}",
     sensor_id_mic, device_id, room_id, amplitude, timestamp
   );
-  sendBLEMessage(String(json_msg));
+  snprintf(topic, sizeof(topic), "ecoguard/sensors/%s/sound", room_id);
+  publishJSON(topic, json_msg);
 
   if (distance >= 0) {
     snprintf(
@@ -219,7 +182,8 @@ void loop()
       "\"sensor_type\":\"distance\",\"value\":%.2f,\"unit\":\"cm\",\"timestamp\":%lu}",
       sensor_id_hcsr04, device_id, room_id, distance, timestamp
     );
-    sendBLEMessage(String(json_msg));
+    snprintf(topic, sizeof(topic), "ecoguard/sensors/%s/distance", room_id);
+    publishJSON(topic, json_msg);
   }
 
   delay(1000);

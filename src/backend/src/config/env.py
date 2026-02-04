@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     cors_origin: str = "*"
     debug: bool = False
     env: str = "development"
+    mqtt_telemetry_source: str = "telemetry"
 
     mqtt: MQTTSettings = MQTTSettings()
     influx: InfluxSettings = InfluxSettings()

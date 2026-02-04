@@ -52,7 +52,7 @@ class InfluxService:
 
         filters = []
         if sensor:
-            filters.append(f'r.sensor == "{sensor}"')
+            filters.append(f'r.sensor_id == "{sensor}"')
         if room:
             filters.append(f'r.room == "{room}"')
 

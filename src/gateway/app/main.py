@@ -1,41 +1,60 @@
 import asyncio
+import json
 import signal
+from typing import Optional, Tuple
+
 from config import load_config
-from mqtt_client import MQTTClient
-from ble_manager import BLEManager
-from command_handler import CommandHandler
+from mqtt_client import MQTTClient, now_ts
+
+
+def _parse_ecoguard_topic(topic: str) -> Tuple[Optional[str], Optional[str]]:
+    parts = topic.split("/")
+    if len(parts) >= 4 and parts[0] == "ecoguard" and parts[1] == "sensors":
+        return parts[2], parts[3]
+    return None, None
+
+
+def _normalize_payload(topic: str, payload: dict) -> Optional[dict]:
+    room_from_topic, metric_from_topic = _parse_ecoguard_topic(topic)
+
+    room = payload.get("room_id") or payload.get("room") or room_from_topic
+    metric = payload.get("sensor_type") or payload.get("metric") or metric_from_topic
+    sensor_id = payload.get("device_id") or payload.get("sensor_id") or payload.get("parent_device_id")
+    value = payload.get("value", payload.get("amplitude"))
+    ts = payload.get("timestamp", payload.get("ts", now_ts()))
+
+    if not all([room, metric, sensor_id]) or value is None:
+        return None
+
+    return {
+        "room": room,
+        "sensor_id": sensor_id,
+        "metric": metric,
+        "value": value,
+        "ts": ts,
+    }
 
 
 async def run() -> None:
-
     config = load_config()
-    print("[INFO] Capteurs BLE chargés:")
-    for sensor in config.sensors:
-        print(
-            f"  - {sensor.sensor_id} | room={sensor.room} | name={sensor.name} | "
-            f"address={sensor.address} | uuid={sensor.telemetry_uuid} | "
-            f"mode={sensor.mode} | simulated={sensor.simulated}"
-        )
     mqtt = MQTTClient(config.mqtt)
     mqtt.connect()
 
-    # BLEManager va scanner tous les capteurs BLE déclarés dans la config (BLE_SENSORS)
-    # et publier automatiquement chaque service BLE (temp, press, son, dist) sur MQTT
-    ble_manager = BLEManager(config, mqtt)
-    command_handler = CommandHandler(config, mqtt, ble_manager)
+    def _on_message(topic: str, raw_payload: str) -> None:
+        try:
+            payload = json.loads(raw_payload) if raw_payload else {}
+        except json.JSONDecodeError:
+            payload = {}
 
-    await ble_manager.start()
-    command_handler.start()
+        normalized = _normalize_payload(topic, payload)
+        if not normalized:
+            return
 
-    # Vérification explicite des services attendus (optionnel, pour debug)
-    expected_metrics = {"temperature", "pressure", "sound", "distance"}
-    found_metrics = {s.metric for s in config.sensors}
-    missing = expected_metrics - found_metrics
-    if missing:
-        print(f"[WARN] Services BLE manquants dans la config : {missing}")
-    else:
-        print("[INFO] Tous les services BLE attendus sont configurés.")
+        out_topic = f"sensors/{normalized['sensor_id']}/telemetry"
+        mqtt.publish_json(out_topic, normalized, qos=1, retain=False)
 
+    mqtt.set_message_callback(_on_message)
+    mqtt.subscribe("ecoguard/sensors/#", qos=1)
 
     stop_event = asyncio.Event()
 
@@ -53,8 +72,6 @@ async def run() -> None:
         except KeyboardInterrupt:
             pass
 
-    command_handler.stop()
-    await ble_manager.stop()
     mqtt.disconnect()
 
 
