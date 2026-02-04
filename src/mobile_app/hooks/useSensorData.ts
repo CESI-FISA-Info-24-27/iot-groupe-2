@@ -17,7 +17,7 @@ export const useSensorData = () => {
 
   const fetchLatestValues = async (): Promise<Record<SensorType, number | null>> => {
     try {
-      const url = `${API_ENDPOINTS.sensorsHistory}?range=24h`;
+      const url = `${API_ENDPOINTS.sensorsLatest}?range=1h`;
       const response = await fetch(url);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);

@@ -59,6 +59,34 @@ async def get_history(
         )
 
 
+@router.get("/latest", response_model=HistoryResponse)
+async def get_latest(
+    room: Optional[str] = Query(None),
+    sensor_id: Optional[str] = Query(None),
+    range: str = Query("1h", alias="range")
+):
+    """
+    Get latest telemetry per metric from InfluxDB
+    """
+    try:
+        data = await influx_service.query_latest(
+            room=room,
+            sensor_id=sensor_id,
+            range_time=range
+        )
+        return HistoryResponse(
+            success=True,
+            count=len(data),
+            data=data
+        )
+    except Exception:
+        return HistoryResponse(
+            success=True,
+            count=0,
+            data=[]
+        )
+
+
 @router.post("/action", response_model=ActionResponse)
 async def send_action(action: ActionRequest):
     """
@@ -86,4 +114,3 @@ async def send_action(action: ActionRequest):
         success=True,
         topic=topic
     )
-

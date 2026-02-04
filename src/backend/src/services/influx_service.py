@@ -85,6 +85,49 @@ from(bucket: "{settings.influx.bucket}")
             print(f"InfluxDB query failed: {e}")
             raise
 
+    async def query_latest(
+        self,
+        room: Optional[str] = None,
+        sensor_id: Optional[str] = None,
+        range_time: str = "1h"
+    ) -> List[Dict[str, Any]]:
+        """Query latest telemetry per metric from InfluxDB"""
+        if not self.query_api:
+            return []
+
+        filters = ['r._measurement == "telemetry"']
+        if room:
+            filters.append(f'r.room == "{room}"')
+        if sensor_id:
+            filters.append(f'r.sensor_id == "{sensor_id}"')
+
+        filter_clause = " and ".join(filters)
+
+        flux_query = f'''
+from(bucket: "{settings.influx.bucket}")
+  |> range(start: -{range_time})
+  |> filter(fn: (r) => {filter_clause})
+  |> group(columns: ["metric", "sensor_id", "room"])
+  |> last()
+'''
+
+        try:
+            tables = self.query_api.query(flux_query, org=settings.influx.org)
+            rows = []
+            for table in tables:
+                for record in table.records:
+                    rows.append({
+                        "time": record.get_time(),
+                        "measurement": record.get_measurement(),
+                        "field": record.get_field(),
+                        "value": record.get_value(),
+                        **record.values
+                    })
+            return rows
+        except Exception as e:
+            print(f"InfluxDB latest query failed: {e}")
+            raise
+
     def write_telemetry(
         self,
         room: str,
