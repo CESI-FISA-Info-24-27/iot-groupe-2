@@ -78,7 +78,7 @@ jobs:
             fi
 
             echo "Launching Docker build in background..."
-            docker compose up -d --build
+            docker compose up -d --build $(docker compose config --services | grep -v mobile_app)
 
             echo "Waiting for containers to start..."
             sleep 60
