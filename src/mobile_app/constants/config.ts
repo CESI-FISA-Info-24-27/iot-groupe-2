@@ -1,8 +1,9 @@
 // constants/config.ts
 import { SensorConfig } from "@/types/sensors";
 
-// Adresse du serveur IoT via Tailscale
-export const API_BASE_URL = "http://100.114.21.29:3000";
+// Adresse du serveur IoT via IPv6
+export const API_BASE_URL =
+  "http://[2a04:cec0:1211:ec10:2ecf:67ff:fe84:6efa]:3000";
 
 export const API_ENDPOINTS = {
   sensorsHistory: `${API_BASE_URL}/api/sensors/history`,
