@@ -9,6 +9,13 @@ from command_handler import CommandHandler
 async def run() -> None:
 
     config = load_config()
+    print("[INFO] Capteurs BLE chargés:")
+    for sensor in config.sensors:
+        print(
+            f"  - {sensor.sensor_id} | room={sensor.room} | name={sensor.name} | "
+            f"address={sensor.address} | uuid={sensor.telemetry_uuid} | "
+            f"mode={sensor.mode} | simulated={sensor.simulated}"
+        )
     mqtt = MQTTClient(config.mqtt)
     mqtt.connect()
 
