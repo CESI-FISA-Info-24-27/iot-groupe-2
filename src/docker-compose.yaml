@@ -102,19 +102,3 @@ services:
       interval: 10s
       timeout: 10s
       retries: 50
-  
-  mobile_app: # Application Mobile React Native
-    build: ./mobile_app
-    container_name: mobile_app
-    volumes:
-      - ./mobile_app:/app
-      - /app/node_modules
-    environment:
-      - REACT_NATIVE_PACKAGER_HOSTNAME=localhost
-      - BACKEND_URL=http://api:${BACKEND_DEST_PORT}
-    ports:
-      - "${MOBILE_APP_ORIGIN_PORT?:MOBILE_APP_ORIGIN_PORT manquant}:${MOBILE_APP_DEST_PORT?:MOBILE_APP_DEST_PORT manquant}"
-    restart: unless-stopped
-    depends_on:
-      api:
-        condition: service_healthy
