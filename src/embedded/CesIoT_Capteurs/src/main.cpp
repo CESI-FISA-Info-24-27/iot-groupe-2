@@ -104,7 +104,7 @@ float lireDistanceCM()
   delayMicroseconds(10);
   digitalWrite(TRIG_PIN, LOW);
 
-  long duree = pulseIn(ECHO_PIN, HIGH, 30000); // timeout 30ms
+  long duree = pulseIn(ECHO_PIN, HIGH, 1000000);
   if (duree == 0) return -1;
 
   return duree * 0.0343 / 2.0;
@@ -135,6 +135,8 @@ void loop()
     delayMicroseconds(200);
   }
   int amplitude = maxVal - minVal;
+  amplitude = max(amplitude, 20);
+  float niveau = 20.0 * log10((float)amplitude / 20);
 
   // ---------- HC-SR04 ----------
   float distance = lireDistanceCM();
@@ -168,8 +170,8 @@ void loop()
     json_msg,
     sizeof(json_msg),
     "{\"device_id\":\"%s\",\"parent_device_id\":\"%s\",\"room_id\":\"%s\","
-    "\"sensor_type\":\"sound\",\"amplitude\":%d,\"timestamp\":%lu}",
-    sensor_id_mic, device_id, room_id, amplitude, timestamp
+    "\"sensor_type\":\"sound\",\"value\":%.2f,\"unit\":\"dB\",\"timestamp\":%lu}",
+    sensor_id_mic, device_id, room_id, niveau, timestamp
   );
   snprintf(topic, sizeof(topic), "ecoguard/sensors/%s/sound", room_id);
   publishJSON(topic, json_msg);
