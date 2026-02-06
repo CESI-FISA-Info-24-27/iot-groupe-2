@@ -1,9 +1,8 @@
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import Response, StreamingResponse
+import httpx
 import os, time, logging
 from threading import Lock
-from urllib.request import urlopen, Request
-from urllib.error import URLError, HTTPError
 
 router = APIRouter(prefix="/api/camera", tags=["camera"])
 logger = logging.getLogger("camera")
@@ -33,27 +32,21 @@ def snapshot_head():
 
 
 @router.get("/snapshot")
-def snapshot(url: str = Query(DEFAULT_SNAPSHOT_URL)):
+async def snapshot(url: str = Query(DEFAULT_SNAPSHOT_URL)):
     global _last_frame, _last_ts
 
     logger.info("snapshot requested url=%s", url)
     with _cache_lock:
         if _last_frame is not None and (time.time() - _last_ts) < 0.8:
-            logger.info("snapshot cache=hit age=%.3fs", time.time() - _last_ts)
             return Response(content=_last_frame, media_type="image/jpeg", headers={"X-Cache": "hit"})
-
-    headers = {
-        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
-        "Accept": "image/jpeg,*/*",
-        "Cache-Control": "no-cache",
-    }
 
     for _ in range(2):
         try:
-            request = Request(url, headers=headers)
-            with urlopen(request, timeout=12) as response:
-                frame = response.read()
-                content_type = response.headers.get("Content-Type", "image/jpeg")
+            async with httpx.AsyncClient(timeout=httpx.Timeout(12.0)) as client:
+                resp = await client.get(url)
+                resp.raise_for_status()
+                frame = resp.content
+                content_type = resp.headers.get("content-type", "image/jpeg")
             if not frame:
                 raise ValueError("Empty snapshot response")
             with _cache_lock:
@@ -62,113 +55,96 @@ def snapshot(url: str = Query(DEFAULT_SNAPSHOT_URL)):
             logger.info("snapshot cache=miss size=%d", len(frame))
             media_type = content_type if content_type.startswith("image/") else "image/jpeg"
             return Response(content=frame, media_type=media_type, headers={"X-Cache": "miss"})
-        except (HTTPError, URLError, TimeoutError, ValueError) as exc:
+        except (httpx.HTTPError, ValueError) as exc:
             logger.warning("snapshot upstream error url=%s err=%s", url, repr(exc))
             continue
 
     with _cache_lock:
         if _last_frame is not None:
-            logger.warning("snapshot cache=stale age=%.3fs", time.time() - _last_ts)
             return Response(content=_last_frame, media_type="image/jpeg", headers={"X-Cache": "stale"})
 
-    logger.error("snapshot failed url=%s", url)
     raise HTTPException(status_code=502, detail="Camera snapshot failed")
 
 
-def _iter_mjpeg_stream(response, chunk_size: int = 4096):
-    try:
-        while True:
-            chunk = response.read(chunk_size)
-            if not chunk:
-                break
-            yield chunk
-    finally:
-        response.close()
+# ---------------------------------------------------------------------------
+# Proxy MJPEG async avec httpx (comme le groupe 1)
+# httpx stream les bytes au fur et à mesure → pas de buffering
+# ---------------------------------------------------------------------------
+
+async def _proxy_mjpeg_stream(upstream_url: str, tag: str):
+    """
+    Générateur async : ouvre une connexion stream vers le hub,
+    yield chaque chunk au fur et à mesure.
+    """
+    logger.warning("[%s] Connecting to: %s", tag, upstream_url)
+    timeout = httpx.Timeout(connect=5.0, read=30.0, write=5.0, pool=5.0)
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        async with client.stream("GET", upstream_url) as response:
+            logger.warning("[%s] Connected OK status=%s content-type=%s",
+                           tag, response.status_code, response.headers.get("content-type"))
+            if response.status_code != 200:
+                raise httpx.HTTPStatusError(
+                    f"Upstream returned {response.status_code}",
+                    request=response.request, response=response
+                )
+            async for chunk in response.aiter_bytes():
+                yield chunk
 
 
 @router.get("/stream")
-def stream(url: str = Query(None)):
+async def stream(url: str = Query(None)):
     """
     Proxy le flux MJPEG via le stream-hub (fan-out).
-    Le stream-hub est le seul à se connecter à l'ESP32.
-    Si ?url= est fourni, on bypass (test direct ESP32).
+    Si ?url= est fourni, on bypass pour test direct.
     """
-    if url:
-        upstream_url = url
-        logger.warning("[CAM-STREAM] DIRECT mode url=%s", url)
-    else:
-        upstream_url = f"{STREAM_HUB_BASE}/stream/raw"
-        logger.warning("[CAM-STREAM] HUB mode url=%s hub=%s", upstream_url, STREAM_HUB_BASE)
-    headers = {
-        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
-        "Accept": "multipart/x-mixed-replace,image/jpeg,*/*",
-    }
+    upstream_url = url if url else f"{STREAM_HUB_BASE}/stream/raw"
+    logger.warning("[CAM-STREAM] url=%s hub=%s", upstream_url, STREAM_HUB_BASE)
 
     try:
-        logger.warning("[CAM-STREAM] Connecting to upstream: %s", upstream_url)
-        request = Request(upstream_url, headers=headers)
-        response = urlopen(request, timeout=8)
-        logger.warning("[CAM-STREAM] Connected OK, status=%s", response.status)
-    except (HTTPError, URLError, TimeoutError) as exc:
-        logger.error("[CAM-STREAM] FAILED to connect url=%s err=%s", upstream_url, repr(exc))
-        raise HTTPException(status_code=502, detail=f"Camera stream failed: {exc}") from exc
-
-    content_type = response.headers.get(
-        "Content-Type", "multipart/x-mixed-replace"
-    )
-    logger.warning("[CAM-STREAM] Streaming content-type=%s", content_type)
+        # Teste que le hub répond avant de lancer le stream
+        async with httpx.AsyncClient(timeout=httpx.Timeout(5.0)) as client:
+            head = await client.get(f"{STREAM_HUB_BASE}/health")
+            logger.warning("[CAM-STREAM] Hub health=%s", head.status_code)
+    except Exception as exc:
+        logger.error("[CAM-STREAM] Hub unreachable: %s", repr(exc))
+        raise HTTPException(status_code=502, detail=f"Stream hub unreachable: {exc}") from exc
 
     return StreamingResponse(
-        _iter_mjpeg_stream(response),
-        media_type=content_type,
+        _proxy_mjpeg_stream(upstream_url, "CAM-STREAM"),
+        media_type="multipart/x-mixed-replace; boundary=BoundaryString",
         headers={
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "Pragma": "no-cache",
+            "Connection": "keep-alive",
         },
     )
 
 
 # ---------------------------------------------------------------------------
 # Face-stream : /api/camera/face-stream/{filter_name}
-# Passe par le même stream-hub, juste un filtre différent.
 # ---------------------------------------------------------------------------
 
 @router.get("/face-stream/{filter_name}")
-def face_stream(filter_name: str = "blur"):
+async def face_stream(filter_name: str = "blur"):
     """Proxy le flux MJPEG traité par le stream-hub."""
     if filter_name not in AVAILABLE_FILTERS:
         raise HTTPException(status_code=400, detail=f"Filtre inconnu: {filter_name}. Disponibles: {AVAILABLE_FILTERS}")
 
     upstream_url = f"{STREAM_HUB_BASE}/stream/{filter_name}"
-    logger.warning("[CAM-FACE] filter=%s url=%s hub=%s", filter_name, upstream_url, STREAM_HUB_BASE)
-
-    headers = {
-        "User-Agent": "CesIOT-Backend/1.0",
-        "Accept": "multipart/x-mixed-replace,image/jpeg,*/*",
-    }
-
-    try:
-        logger.warning("[CAM-FACE] Connecting to hub: %s", upstream_url)
-        request = Request(upstream_url, headers=headers)
-        response = urlopen(request, timeout=10)
-        logger.warning("[CAM-FACE] Connected OK, status=%s", response.status)
-    except (HTTPError, URLError, TimeoutError) as exc:
-        logger.error("[CAM-FACE] FAILED filter=%s url=%s err=%s", filter_name, upstream_url, repr(exc))
-        raise HTTPException(status_code=502, detail=f"Stream hub unavailable: {exc}") from exc
-
-    content_type = response.headers.get("Content-Type", "multipart/x-mixed-replace")
+    logger.warning("[CAM-FACE] filter=%s url=%s", filter_name, upstream_url)
 
     return StreamingResponse(
-        _iter_mjpeg_stream(response),
-        media_type=content_type,
+        _proxy_mjpeg_stream(upstream_url, "CAM-FACE"),
+        media_type="multipart/x-mixed-replace; boundary=BoundaryString",
         headers={
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "Pragma": "no-cache",
+            "Connection": "keep-alive",
         },
     )
 
 
 @router.get("/filters")
 def list_filters():
-    """Liste les filtres face-detector disponibles."""
+    """Liste les filtres disponibles."""
     return {"filters": AVAILABLE_FILTERS}
