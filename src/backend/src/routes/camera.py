@@ -81,7 +81,10 @@ async def _open_upstream_stream(upstream_url: str, tag: str):
     Le caller DOIT fermer client et response.
     """
     logger.warning("[%s] Connecting to: %s", tag, upstream_url)
-    client = httpx.AsyncClient(timeout=None)
+    client = httpx.AsyncClient(
+        timeout=None,
+        headers={"Accept": "multipart/x-mixed-replace"},
+    )
     try:
         upstream = await client.send(
             client.build_request("GET", upstream_url),
@@ -131,12 +134,14 @@ async def stream(url: str = Query(None)):
 
     return StreamingResponse(
         relay(),
-        media_type=content_type,
+        media_type=None,
         headers={
+            "Content-Type": content_type,
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "Pragma": "no-cache",
             "Expires": "0",
             "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
         },
     )
 
@@ -171,12 +176,14 @@ async def face_stream(filter_name: str = "blur"):
 
     return StreamingResponse(
         relay(),
-        media_type=content_type,
+        media_type=None,
         headers={
+            "Content-Type": content_type,
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "Pragma": "no-cache",
             "Expires": "0",
             "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
         },
     )
 
