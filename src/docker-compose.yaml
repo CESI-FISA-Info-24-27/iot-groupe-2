@@ -12,6 +12,7 @@ services:
       - INFLUX_ORG=${INFLUXDB_INIT_ORG:?INFLUXDB_INIT_ORG manquant}
       - INFLUX_BUCKET=${INFLUXDB_INIT_BUCKET:?INFLUXDB_INIT_BUCKET manquant}
       - INFLUX_TOKEN=${INFLUXDB_INIT_ADMIN_TOKEN:?INFLUXDB_INIT_ADMIN_TOKEN manquant}
+      - STREAM_HUB_URL=http://face-detector:8890
     ports:
       - "${BACKEND_ORIGIN_PORT:?BACKEND_ORIGIN_PORT manquant}:${BACKEND_DEST_PORT:?BACKEND_DEST_PORT manquant}"
     volumes:
@@ -21,6 +22,8 @@ services:
       influxdb:
         condition: service_healthy
       mqtt-broker:
+        condition: service_healthy
+      face-detector:
         condition: service_healthy
     healthcheck:
       test:
@@ -78,7 +81,7 @@ services:
       timeout: 5s
       retries: 5
 
-  face-detector: # Détection de visages + flux MJPEG traité
+  face-detector: # Stream hub : 1 ESP32 → N clients (raw + filtres visages)
     build: ./face-detector
     container_name: face-detector
     environment:

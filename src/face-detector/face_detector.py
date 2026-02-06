@@ -4,9 +4,13 @@ CesIOT – Face Detector + MJPEG Restreamer
 Reçoit le flux MJPEG de l'ESP32-CAM, détecte les visages via Haar Cascades,
 applique un filtre (flou, etc.) et re-sert un flux MJPEG traité.
 
+Architecture fan-out : UNE seule connexion à l'ESP32-CAM,
+re-servie en N flux simultanés pour les clients.
+
 Endpoints :
+  /stream/raw          → Flux brut re-servi (pas de traitement)
   /stream/blur         → Floutage des visages (défaut)
-  /stream/none         → Flux brut retransmis (aucun traitement)
+  /stream/none         → Alias de raw
   /stream/grayscale    → Noir & Blanc
   /stream/edges        → Contours (Canny)
   /stream/nightvision  → Vert amplifié
@@ -87,7 +91,7 @@ class MJPEGStreamHandler(BaseHTTPRequestHandler):
 
 
 class FaceDetector:
-    FILTERS = ["blur", "none", "grayscale", "edges", "nightvision", "thermal", "highcontrast"]
+    FILTERS = ["raw", "blur", "none", "grayscale", "edges", "nightvision", "thermal", "highcontrast"]
 
     def __init__(self):
         self.esp32_url = os.getenv("ESP32_CAM_URL", "http://172.20.10.13:81/stream")
@@ -132,7 +136,7 @@ class FaceDetector:
                 except Exception:
                     pass
             return f
-        if name == "none":
+        if name in ("none", "raw"):
             return f
         if name == "grayscale":
             return cv2.cvtColor(cv2.cvtColor(f, cv2.COLOR_BGR2GRAY), cv2.COLOR_GRAY2BGR)
@@ -182,7 +186,9 @@ class FaceDetector:
 
         self.server = Server()
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
-        print(f"✅ MJPEG sur http://0.0.0.0:{self.http_port}/stream/blur", flush=True)
+        print(f"✅ Stream-hub sur http://0.0.0.0:{self.http_port}", flush=True)
+        print(f"   /stream/raw  → flux brut (fan-out)", flush=True)
+        print(f"   /stream/blur → flou visages", flush=True)
 
     def read_esp32(self):
         sess = requests.Session()
@@ -222,7 +228,8 @@ class FaceDetector:
 
     def run(self):
         print("=" * 50)
-        print("  CesIOT – Face Detector + MJPEG")
+        print("  CesIOT – Stream Hub (fan-out)")
+        print("  1 ESP32 → N clients")
         print("=" * 50)
         print(f"📹 Source: {self.esp32_url}")
         print(f"🎬 {self.w}x{self.h} | détection 1/{self.skip} frames")

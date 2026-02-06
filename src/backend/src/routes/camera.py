@@ -1,7 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import Response, StreamingResponse
-import time
-import logging
+import os, time, logging
 from threading import Lock
 from urllib.request import urlopen, Request
 from urllib.error import URLError, HTTPError
@@ -11,6 +10,15 @@ logger = logging.getLogger("camera")
 
 DEFAULT_SNAPSHOT_URL = "http://172.20.10.13/capture"
 DEFAULT_STREAM_URL = "http://172.20.10.13:81/stream"
+
+# ---------------------------------------------------------------------------
+# Stream hub : le face-detector est le SEUL consommateur du flux ESP32.
+# Le backend proxy tout à travers lui (flux brut + filtres).
+# L'ESP32-CAM ne supporte qu'UN seul client MJPEG simultané.
+# ---------------------------------------------------------------------------
+STREAM_HUB_BASE = os.environ.get("STREAM_HUB_URL", "http://face-detector:8890")
+AVAILABLE_FILTERS = ["raw", "blur", "none", "grayscale", "edges", "nightvision", "thermal", "highcontrast"]
+
 _cache_lock = Lock()
 _last_frame = None
 _last_ts = 0.0
@@ -79,18 +87,28 @@ def _iter_mjpeg_stream(response, chunk_size: int = 4096):
 
 
 @router.get("/stream")
-def stream(url: str = Query(DEFAULT_STREAM_URL)):
-    logger.info("stream requested url=%s", url)
+def stream(url: str = Query(None)):
+    """
+    Proxy le flux MJPEG via le stream-hub (fan-out).
+    Le stream-hub est le seul à se connecter à l'ESP32.
+    Si ?url= est fourni, on bypass (test direct ESP32).
+    """
+    if url:
+        upstream_url = url
+        logger.info("stream direct url=%s", url)
+    else:
+        upstream_url = f"{STREAM_HUB_BASE}/stream/raw"
+        logger.info("stream via hub url=%s", upstream_url)
     headers = {
         "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
         "Accept": "multipart/x-mixed-replace,image/jpeg,*/*",
     }
 
     try:
-        request = Request(url, headers=headers)
+        request = Request(upstream_url, headers=headers)
         response = urlopen(request, timeout=8)
     except (HTTPError, URLError, TimeoutError) as exc:
-        logger.exception("stream upstream error url=%s", url)
+        logger.exception("stream upstream error url=%s", upstream_url)
         raise HTTPException(status_code=502, detail="Camera stream failed") from exc
 
     content_type = response.headers.get(
@@ -109,22 +127,17 @@ def stream(url: str = Query(DEFAULT_STREAM_URL)):
 
 
 # ---------------------------------------------------------------------------
-# Face-detector proxy : /api/camera/face-stream/{filter_name}
-# Le face-detector tourne dans un conteneur Docker séparé sur le port 8890.
-# Le backend le proxy exactement comme il proxy l'ESP32 → pas de changement
-# de pattern pour l'app mobile.
+# Face-stream : /api/camera/face-stream/{filter_name}
+# Passe par le même stream-hub, juste un filtre différent.
 # ---------------------------------------------------------------------------
-FACE_DETECTOR_BASE = "http://face-detector:8890"
-AVAILABLE_FILTERS = ["blur", "none", "grayscale", "edges", "nightvision", "thermal", "highcontrast"]
-
 
 @router.get("/face-stream/{filter_name}")
 def face_stream(filter_name: str = "blur"):
-    """Proxy le flux MJPEG traité par le service face-detector."""
+    """Proxy le flux MJPEG traité par le stream-hub."""
     if filter_name not in AVAILABLE_FILTERS:
         raise HTTPException(status_code=400, detail=f"Filtre inconnu: {filter_name}. Disponibles: {AVAILABLE_FILTERS}")
 
-    upstream_url = f"{FACE_DETECTOR_BASE}/stream/{filter_name}"
+    upstream_url = f"{STREAM_HUB_BASE}/stream/{filter_name}"
     logger.info("face-stream filter=%s url=%s", filter_name, upstream_url)
 
     headers = {
@@ -137,7 +150,7 @@ def face_stream(filter_name: str = "blur"):
         response = urlopen(request, timeout=10)
     except (HTTPError, URLError, TimeoutError) as exc:
         logger.exception("face-stream upstream error filter=%s", filter_name)
-        raise HTTPException(status_code=502, detail="Face detector unavailable") from exc
+        raise HTTPException(status_code=502, detail="Stream hub unavailable") from exc
 
     content_type = response.headers.get("Content-Type", "multipart/x-mixed-replace")
 
