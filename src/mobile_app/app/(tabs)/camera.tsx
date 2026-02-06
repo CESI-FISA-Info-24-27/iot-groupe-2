@@ -26,8 +26,8 @@ export default function CameraScreen() {
   const theme = useAppTheme();
   const styles = getStyles(theme);
 
-  // Flux direct ESP32 (endpoint historique)
-  const streamUrl = API_ENDPOINTS.cameraStream;
+  // Tout passe par le stream-hub (face-detector) → fan-out unique
+  const streamUrl = API_ENDPOINTS.cameraFaceStream(activeFilter);
 
   console.log("[CameraScreen] filter=", activeFilter, "url=", streamUrl);
 
