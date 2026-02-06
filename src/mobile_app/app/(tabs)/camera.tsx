@@ -6,11 +6,9 @@ import { API_ENDPOINTS } from "@/constants/config";
 import { useAppTheme } from "@/constants/theme";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
-type CameraMode = "raw" | "face";
-
 const FILTERS = [
-  { id: "blur", label: "Vie privée", icon: "eye-off" as const },
   { id: "none", label: "Normale", icon: "camera" as const },
+  { id: "blur", label: "Vie privée", icon: "eye-off" as const },
   {
     id: "grayscale",
     label: "Noir & Blanc",
@@ -23,23 +21,24 @@ const FILTERS = [
 ];
 
 export default function CameraScreen() {
-  const [mode, setMode] = useState<CameraMode>("raw");
-  const [activeFilter, setActiveFilter] = useState("blur");
+  const [activeFilter, setActiveFilter] = useState("none");
   const [streamError, setStreamError] = useState<string | null>(null);
   const theme = useAppTheme();
   const styles = getStyles(theme);
 
-  // raw → proxy backend existant (inchangé), face → face-detector via backend
-  const streamUrl =
-    mode === "raw"
-      ? API_ENDPOINTS.cameraStream
-      : API_ENDPOINTS.cameraFaceStream(activeFilter);
+  // Tout passe par le stream-hub (face-detector) → fan-out unique
+  const streamUrl = API_ENDPOINTS.cameraFaceStream(activeFilter);
+
+  console.log("[CameraScreen] filter=", activeFilter, "url=", streamUrl);
 
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Caméra en direct</Text>
+        <Text style={styles.debugUrl} numberOfLines={1}>
+          {streamUrl}
+        </Text>
         {streamError ? (
           <Text style={styles.statusError}>{streamError}</Text>
         ) : (
@@ -47,77 +46,37 @@ export default function CameraScreen() {
         )}
       </View>
 
-      {/* Mode toggle */}
-      <View style={styles.toggleRow}>
-        <Pressable
-          style={[styles.toggleBtn, mode === "raw" && styles.toggleBtnActive]}
-          onPress={() => setMode("raw")}
-        >
-          <MaterialCommunityIcons
-            name="camera"
-            size={18}
-            color={mode === "raw" ? "#fff" : theme.colors.textMuted}
-          />
-          <Text
-            style={[
-              styles.toggleLabel,
-              mode === "raw" && styles.toggleLabelActive,
-            ]}
-          >
-            Cam normale
-          </Text>
-        </Pressable>
-
-        <Pressable
-          style={[styles.toggleBtn, mode === "face" && styles.toggleBtnActive]}
-          onPress={() => setMode("face")}
-        >
-          <MaterialCommunityIcons
-            name="face-recognition"
-            size={18}
-            color={mode === "face" ? "#fff" : theme.colors.textMuted}
-          />
-          <Text
-            style={[
-              styles.toggleLabel,
-              mode === "face" && styles.toggleLabelActive,
-            ]}
-          >
-            Flou visages
-          </Text>
-        </Pressable>
-      </View>
-
-      {/* Filter chips (visible seulement en mode face) */}
-      {mode === "face" && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterRow}
-        >
-          {FILTERS.map((f) => {
-            const active = f.id === activeFilter;
-            return (
-              <Pressable
-                key={f.id}
-                onPress={() => setActiveFilter(f.id)}
-                style={[styles.chip, active && styles.chipActive]}
+      {/* Filter chips — toujours visibles */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.filterRow}
+      >
+        {FILTERS.map((f) => {
+          const active = f.id === activeFilter;
+          return (
+            <Pressable
+              key={f.id}
+              onPress={() => {
+                console.log("[CameraScreen] Switching filter to:", f.id);
+                setActiveFilter(f.id);
+              }}
+              style={[styles.chip, active && styles.chipActive]}
+            >
+              <MaterialCommunityIcons
+                name={f.icon}
+                size={16}
+                color={active ? theme.colors.accent : theme.colors.textMuted}
+              />
+              <Text
+                style={[styles.chipLabel, active && styles.chipLabelActive]}
               >
-                <MaterialCommunityIcons
-                  name={f.icon}
-                  size={16}
-                  color={active ? theme.colors.accent : theme.colors.textMuted}
-                />
-                <Text
-                  style={[styles.chipLabel, active && styles.chipLabelActive]}
-                >
-                  {f.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-      )}
+                {f.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
 
       {/* Stream */}
       <View style={styles.streamContainer}>
@@ -150,6 +109,12 @@ const getStyles = (theme: ReturnType<typeof useAppTheme>) =>
       color: theme.colors.text,
       marginBottom: 4,
     },
+    debugUrl: {
+      color: theme.colors.textMuted,
+      fontSize: 10,
+      fontFamily: "monospace" as const,
+      marginTop: 2,
+    },
     statusOk: {
       color: theme.colors.success,
       fontSize: 12,
@@ -159,36 +124,6 @@ const getStyles = (theme: ReturnType<typeof useAppTheme>) =>
       color: theme.colors.danger,
       fontSize: 12,
       marginTop: 4,
-    },
-    toggleRow: {
-      flexDirection: "row",
-      gap: 10,
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-    },
-    toggleBtn: {
-      flex: 1,
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 8,
-      paddingVertical: 10,
-      borderRadius: 12,
-      backgroundColor: theme.colors.surface,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-    },
-    toggleBtnActive: {
-      backgroundColor: theme.colors.accent,
-      borderColor: theme.colors.accent,
-    },
-    toggleLabel: {
-      fontSize: 14,
-      fontWeight: "600",
-      color: theme.colors.textMuted,
-    },
-    toggleLabelActive: {
-      color: "#fff",
     },
     filterRow: {
       paddingHorizontal: 16,

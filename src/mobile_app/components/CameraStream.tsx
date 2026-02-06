@@ -1,5 +1,12 @@
 import React, { useMemo, useState } from "react";
-import { ActivityIndicator, StyleProp, StyleSheet, Text, View, ViewStyle } from "react-native";
+import {
+  ActivityIndicator,
+  StyleProp,
+  StyleSheet,
+  Text,
+  View,
+  ViewStyle,
+} from "react-native";
 import { WebView } from "react-native-webview";
 import { useAppTheme } from "@/constants/theme";
 
@@ -9,14 +16,21 @@ type CameraStreamProps = {
   onErrorChange?: (message: string | null) => void;
 };
 
-export const CameraStream: React.FC<CameraStreamProps> = ({ streamUrl, style, onErrorChange }) => {
+export const CameraStream: React.FC<CameraStreamProps> = ({
+  streamUrl,
+  style,
+  onErrorChange,
+}) => {
   const theme = useAppTheme();
   const styles = getStyles(theme);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const htmlContent = useMemo(
-    () => `
+  console.log("[CameraStream] Rendering with URL:", streamUrl);
+
+  const htmlContent = useMemo(() => {
+    console.log("[CameraStream] Building HTML for:", streamUrl);
+    return `
       <!DOCTYPE html>
       <html>
         <head>
@@ -25,29 +39,56 @@ export const CameraStream: React.FC<CameraStreamProps> = ({ streamUrl, style, on
           <style>
             * { margin: 0; padding: 0; box-sizing: border-box; }
             body, html { width: 100%; height: 100%; background: #000; overflow: hidden; }
-            #wrap { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+            #wrap { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; flex-direction: column; }
             img { width: 100%; height: 100%; object-fit: cover; display: block; }
-            #error { display: none; color: #fff; font-family: -apple-system, Arial, sans-serif; }
+            #error { display: none; color: #ff4444; font-family: -apple-system, Arial, sans-serif; font-size: 14px; text-align: center; padding: 20px; }
+            #debug { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.8); color: #0f0; font-size: 10px; padding: 4px 8px; font-family: monospace; z-index: 999; word-break: break-all; }
           </style>
         </head>
         <body>
           <div id="wrap">
             <img id="stream" src="${streamUrl}" alt="camera stream" />
-            <div id="error">Flux indisponible</div>
+            <div id="error"></div>
           </div>
+          <div id="debug">Loading: ${streamUrl}</div>
           <script>
             const img = document.getElementById('stream');
-            const error = document.getElementById('error');
-            img.onerror = () => {
-              img.style.display = 'none';
-              error.style.display = 'block';
+            const errorDiv = document.getElementById('error');
+            const debug = document.getElementById('debug');
+            let startTime = Date.now();
+
+            debug.textContent = 'Loading: ' + '${streamUrl}';
+
+            img.onload = () => {
+              const elapsed = Date.now() - startTime;
+              debug.textContent = 'OK (' + elapsed + 'ms) : ' + '${streamUrl}';
+              debug.style.color = '#0f0';
+              window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({type:'loaded', elapsed: elapsed}));
             };
+
+            img.onerror = (e) => {
+              const elapsed = Date.now() - startTime;
+              img.style.display = 'none';
+              errorDiv.style.display = 'block';
+              errorDiv.textContent = 'Flux indisponible';
+              debug.textContent = 'ERREUR (' + elapsed + 'ms) : ' + '${streamUrl}';
+              debug.style.color = '#f44';
+              window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({type:'error', elapsed: elapsed, url: '${streamUrl}'}));
+            };
+
+            // Timeout 15s
+            setTimeout(() => {
+              if (!img.complete || img.naturalWidth === 0) {
+                debug.textContent = 'TIMEOUT 15s : ' + '${streamUrl}';
+                debug.style.color = '#fa0';
+                window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({type:'timeout', url: '${streamUrl}'}));
+              }
+            }, 15000);
           </script>
         </body>
       </html>
-    `,
-    [streamUrl]
-  );
+    `;
+  }, [streamUrl]);
 
   return (
     <View style={[styles.container, style]}>
@@ -61,18 +102,38 @@ export const CameraStream: React.FC<CameraStreamProps> = ({ streamUrl, style, on
         scrollEnabled={false}
         cacheEnabled={false}
         onLoadStart={() => {
+          console.log("[CameraStream] WebView onLoadStart");
           setLoading(true);
           setError(null);
           onErrorChange?.(null);
         }}
         onLoadEnd={() => {
+          console.log("[CameraStream] WebView onLoadEnd");
           setLoading(false);
         }}
-        onError={() => {
+        onError={(e) => {
+          console.log("[CameraStream] WebView onError:", e.nativeEvent);
           setLoading(false);
           const message = "Erreur lors du chargement du flux";
           setError(message);
           onErrorChange?.(message);
+        }}
+        onMessage={(event) => {
+          try {
+            const data = JSON.parse(event.nativeEvent.data);
+            console.log("[CameraStream] Message from WebView:", data);
+            if (data.type === "error" || data.type === "timeout") {
+              onErrorChange?.(`Stream ${data.type}: ${streamUrl}`);
+            }
+          } catch {}
+        }}
+        onHttpError={(e) => {
+          console.log(
+            "[CameraStream] HTTP Error:",
+            e.nativeEvent.statusCode,
+            streamUrl,
+          );
+          onErrorChange?.(`HTTP ${e.nativeEvent.statusCode}`);
         }}
       />
 

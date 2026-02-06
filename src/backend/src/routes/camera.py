@@ -95,26 +95,28 @@ def stream(url: str = Query(None)):
     """
     if url:
         upstream_url = url
-        logger.info("stream direct url=%s", url)
+        logger.warning("[CAM-STREAM] DIRECT mode url=%s", url)
     else:
         upstream_url = f"{STREAM_HUB_BASE}/stream/raw"
-        logger.info("stream via hub url=%s", upstream_url)
+        logger.warning("[CAM-STREAM] HUB mode url=%s hub=%s", upstream_url, STREAM_HUB_BASE)
     headers = {
         "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
         "Accept": "multipart/x-mixed-replace,image/jpeg,*/*",
     }
 
     try:
+        logger.warning("[CAM-STREAM] Connecting to upstream: %s", upstream_url)
         request = Request(upstream_url, headers=headers)
         response = urlopen(request, timeout=8)
+        logger.warning("[CAM-STREAM] Connected OK, status=%s", response.status)
     except (HTTPError, URLError, TimeoutError) as exc:
-        logger.exception("stream upstream error url=%s", upstream_url)
-        raise HTTPException(status_code=502, detail="Camera stream failed") from exc
+        logger.error("[CAM-STREAM] FAILED to connect url=%s err=%s", upstream_url, repr(exc))
+        raise HTTPException(status_code=502, detail=f"Camera stream failed: {exc}") from exc
 
     content_type = response.headers.get(
         "Content-Type", "multipart/x-mixed-replace"
     )
-    logger.info("stream upstream content-type=%s", content_type)
+    logger.warning("[CAM-STREAM] Streaming content-type=%s", content_type)
 
     return StreamingResponse(
         _iter_mjpeg_stream(response),
@@ -138,7 +140,7 @@ def face_stream(filter_name: str = "blur"):
         raise HTTPException(status_code=400, detail=f"Filtre inconnu: {filter_name}. Disponibles: {AVAILABLE_FILTERS}")
 
     upstream_url = f"{STREAM_HUB_BASE}/stream/{filter_name}"
-    logger.info("face-stream filter=%s url=%s", filter_name, upstream_url)
+    logger.warning("[CAM-FACE] filter=%s url=%s hub=%s", filter_name, upstream_url, STREAM_HUB_BASE)
 
     headers = {
         "User-Agent": "CesIOT-Backend/1.0",
@@ -146,11 +148,13 @@ def face_stream(filter_name: str = "blur"):
     }
 
     try:
+        logger.warning("[CAM-FACE] Connecting to hub: %s", upstream_url)
         request = Request(upstream_url, headers=headers)
         response = urlopen(request, timeout=10)
+        logger.warning("[CAM-FACE] Connected OK, status=%s", response.status)
     except (HTTPError, URLError, TimeoutError) as exc:
-        logger.exception("face-stream upstream error filter=%s", filter_name)
-        raise HTTPException(status_code=502, detail="Stream hub unavailable") from exc
+        logger.error("[CAM-FACE] FAILED filter=%s url=%s err=%s", filter_name, upstream_url, repr(exc))
+        raise HTTPException(status_code=502, detail=f"Stream hub unavailable: {exc}") from exc
 
     content_type = response.headers.get("Content-Type", "multipart/x-mixed-replace")
 
