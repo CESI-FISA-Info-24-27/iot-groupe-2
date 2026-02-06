@@ -10,14 +10,6 @@ logger = logging.getLogger("camera")
 DEFAULT_SNAPSHOT_URL = "http://172.20.10.13/capture"
 DEFAULT_STREAM_URL = "http://172.20.10.13:81/stream"
 
-# ---------------------------------------------------------------------------
-# Stream hub : le face-detector est le SEUL consommateur du flux ESP32.
-# Le backend proxy tout à travers lui (flux brut + filtres).
-# L'ESP32-CAM ne supporte qu'UN seul client MJPEG simultané.
-# ---------------------------------------------------------------------------
-STREAM_HUB_BASE = os.environ.get("STREAM_HUB_URL", "http://face-detector:8890")
-AVAILABLE_FILTERS = ["raw", "blur", "none", "grayscale", "edges", "nightvision", "thermal", "highcontrast"]
-
 _cache_lock = Lock()
 _last_frame = None
 _last_ts = 0.0
@@ -109,12 +101,12 @@ async def _open_upstream_stream(upstream_url: str, tag: str):
 
 
 @router.get("/stream")
-async def stream(url: str = Query(None)):
+async def stream(url: str = Query(DEFAULT_STREAM_URL)):
     """
-    Proxy le flux MJPEG via le stream-hub (fan-out).
+    Proxy le flux MJPEG directement depuis l'ESP32-CAM.
     Si ?url= est fourni, on bypass pour test direct.
     """
-    upstream_url = url if url else f"{STREAM_HUB_BASE}/stream/raw"
+    upstream_url = url if url else DEFAULT_STREAM_URL
     logger.warning("[CAM-STREAM] url=%s", upstream_url)
 
     client, upstream, content_type = await _open_upstream_stream(upstream_url, "CAM-STREAM")
@@ -145,50 +137,3 @@ async def stream(url: str = Query(None)):
         },
     )
 
-
-# ---------------------------------------------------------------------------
-# Face-stream : /api/camera/face-stream/{filter_name}
-# ---------------------------------------------------------------------------
-
-@router.get("/face-stream/{filter_name}")
-async def face_stream(filter_name: str = "blur"):
-    """Proxy le flux MJPEG traité par le stream-hub."""
-    if filter_name not in AVAILABLE_FILTERS:
-        raise HTTPException(status_code=400, detail=f"Filtre inconnu: {filter_name}. Disponibles: {AVAILABLE_FILTERS}")
-
-    upstream_url = f"{STREAM_HUB_BASE}/stream/{filter_name}"
-    logger.warning("[CAM-FACE] filter=%s url=%s", filter_name, upstream_url)
-
-    client, upstream, content_type = await _open_upstream_stream(upstream_url, "CAM-FACE")
-
-    async def relay():
-        try:
-            async for chunk in upstream.aiter_bytes(chunk_size=4096):
-                yield chunk
-        except httpx.ReadTimeout:
-            logger.error("[CAM-FACE] Read timeout filter=%s", filter_name)
-        except Exception as e:
-            logger.error("[CAM-FACE] Error: %s", e)
-        finally:
-            await upstream.aclose()
-            await client.aclose()
-            logger.warning("[CAM-FACE] Stream closed filter=%s", filter_name)
-
-    return StreamingResponse(
-        relay(),
-        media_type=None,
-        headers={
-            "Content-Type": content_type,
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Pragma": "no-cache",
-            "Expires": "0",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
-    )
-
-
-@router.get("/filters")
-def list_filters():
-    """Liste les filtres disponibles."""
-    return {"filters": AVAILABLE_FILTERS}
