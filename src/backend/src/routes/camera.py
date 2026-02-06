@@ -106,3 +106,52 @@ def stream(url: str = Query(DEFAULT_STREAM_URL)):
             "Pragma": "no-cache",
         },
     )
+
+
+# ---------------------------------------------------------------------------
+# Face-detector proxy : /api/camera/face-stream/{filter_name}
+# Le face-detector tourne dans un conteneur Docker séparé sur le port 8890.
+# Le backend le proxy exactement comme il proxy l'ESP32 → pas de changement
+# de pattern pour l'app mobile.
+# ---------------------------------------------------------------------------
+FACE_DETECTOR_BASE = "http://face-detector:8890"
+AVAILABLE_FILTERS = ["blur", "none", "grayscale", "edges", "nightvision", "thermal", "highcontrast"]
+
+
+@router.get("/face-stream/{filter_name}")
+def face_stream(filter_name: str = "blur"):
+    """Proxy le flux MJPEG traité par le service face-detector."""
+    if filter_name not in AVAILABLE_FILTERS:
+        raise HTTPException(status_code=400, detail=f"Filtre inconnu: {filter_name}. Disponibles: {AVAILABLE_FILTERS}")
+
+    upstream_url = f"{FACE_DETECTOR_BASE}/stream/{filter_name}"
+    logger.info("face-stream filter=%s url=%s", filter_name, upstream_url)
+
+    headers = {
+        "User-Agent": "CesIOT-Backend/1.0",
+        "Accept": "multipart/x-mixed-replace,image/jpeg,*/*",
+    }
+
+    try:
+        request = Request(upstream_url, headers=headers)
+        response = urlopen(request, timeout=10)
+    except (HTTPError, URLError, TimeoutError) as exc:
+        logger.exception("face-stream upstream error filter=%s", filter_name)
+        raise HTTPException(status_code=502, detail="Face detector unavailable") from exc
+
+    content_type = response.headers.get("Content-Type", "multipart/x-mixed-replace")
+
+    return StreamingResponse(
+        _iter_mjpeg_stream(response),
+        media_type=content_type,
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+        },
+    )
+
+
+@router.get("/filters")
+def list_filters():
+    """Liste les filtres face-detector disponibles."""
+    return {"filters": AVAILABLE_FILTERS}

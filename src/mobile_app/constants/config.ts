@@ -2,8 +2,7 @@
 import { SensorConfig } from "@/types/sensors";
 
 // Adresse du serveur IoT via IPv6
-export const API_BASE_URL =
-  "http://172.20.10.10:3000";
+export const API_BASE_URL = "http://172.20.10.10:3000";
 
 export const API_ENDPOINTS = {
   sensorsHistory: `${API_BASE_URL}/api/sensors/history`,
@@ -11,6 +10,8 @@ export const API_ENDPOINTS = {
   health: `${API_BASE_URL}/health`,
   cameraSnapshot: `${API_BASE_URL}/api/camera/snapshot`,
   cameraStream: `${API_BASE_URL}/api/camera/stream`,
+  cameraFaceStream: (filter: string) =>
+    `${API_BASE_URL}/api/camera/face-stream/${filter}`,
   camera: `http://172.20.10.13/capture`, // Snapshot caméra
 };
 
