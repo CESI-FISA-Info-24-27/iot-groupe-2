@@ -1,6 +1,6 @@
 // hooks/useBackendHealth.ts
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { API_ENDPOINTS, REFRESH_INTERVAL } from '@/constants/config';
+import { useCallback, useEffect, useRef, useState } from "react";
+import { API_ENDPOINTS, REFRESH_INTERVAL } from "@/constants/config";
 
 type HealthResponse = {
   status?: string;
@@ -22,15 +22,25 @@ export const useBackendHealth = () => {
       if (showLoading) {
         setLoading(true);
       }
+      console.log("🏥 Checking health at:", API_ENDPOINTS.health);
       const response = await fetch(API_ENDPOINTS.health);
+      console.log("🏥 Health response status:", response.status);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const result = (await response.json()) as HealthResponse;
-      setData(prev => (JSON.stringify(prev) === JSON.stringify(result) ? prev : result));
+      console.log("🏥 Health result:", JSON.stringify(result));
+      setData((prev) =>
+        JSON.stringify(prev) === JSON.stringify(result) ? prev : result,
+      );
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Une erreur est survenue');
+      console.error("🏥 Health check failed:", err);
+      console.error(
+        "🏥 Error details:",
+        JSON.stringify(err, Object.getOwnPropertyNames(err)),
+      );
+      setError(err instanceof Error ? err.message : "Une erreur est survenue");
       setData(null);
     } finally {
       if (showLoading || !hasLoadedRef.current) {

@@ -1,7 +1,7 @@
 // hooks/useSensorData.ts
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { SensorData, SensorType } from '@/types/sensors';
-import { API_ENDPOINTS, REFRESH_INTERVAL } from '@/constants/config';
+import { useState, useEffect, useCallback, useRef } from "react";
+import { SensorData, SensorType } from "@/types/sensors";
+import { API_ENDPOINTS, REFRESH_INTERVAL } from "@/constants/config";
 
 export const useSensorData = () => {
   const [data, setData] = useState<SensorData>({
@@ -15,10 +15,18 @@ export const useSensorData = () => {
   const [error, setError] = useState<string | null>(null);
   const hasLoadedRef = useRef(false);
 
-  const fetchLatestValues = async (): Promise<Record<SensorType, number | null>> => {
+  const fetchLatestValues = async (): Promise<
+    Record<SensorType, number | null>
+  > => {
     try {
       const url = `${API_ENDPOINTS.sensorsLatest}?range=1h`;
+      console.log("🔍 Fetching from URL:", url);
       const response = await fetch(url);
+      console.log("📡 Response status:", response.status, response.statusText);
+      console.log(
+        "📡 Response headers:",
+        JSON.stringify(Object.fromEntries(response.headers.entries())),
+      );
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -44,7 +52,11 @@ export const useSensorData = () => {
 
       return latest;
     } catch (err) {
-      console.error('Error fetching sensor history:', err);
+      console.error("❌ Error fetching sensor data:", err);
+      console.error(
+        "❌ Error details:",
+        JSON.stringify(err, Object.getOwnPropertyNames(err)),
+      );
       return {
         temperature: null,
         pressure: null,
@@ -61,7 +73,7 @@ export const useSensorData = () => {
       }
       const latest = await fetchLatestValues();
 
-      setData(prev => {
+      setData((prev) => {
         const next = {
           temperature: latest.temperature,
           pressure: latest.pressure,
@@ -78,7 +90,7 @@ export const useSensorData = () => {
       });
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Une erreur est survenue');
+      setError(err instanceof Error ? err.message : "Une erreur est survenue");
     } finally {
       if (showLoading || !hasLoadedRef.current) {
         setLoading(false);
