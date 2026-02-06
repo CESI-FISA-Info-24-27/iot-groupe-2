@@ -67,28 +67,42 @@ async def snapshot(url: str = Query(DEFAULT_SNAPSHOT_URL)):
 
 
 # ---------------------------------------------------------------------------
-# Proxy MJPEG async avec httpx (comme le groupe 1)
-# httpx stream les bytes au fur et à mesure → pas de buffering
+# Proxy MJPEG async — copié du pattern du groupe 1 (qui fonctionne)
+# Points clés :
+#   1. timeout=None (le stream dure indéfiniment)
+#   2. PAS de async with → cleanup manuel dans finally
+#   3. Forward le Content-Type réel de l'upstream (boundary correct)
 # ---------------------------------------------------------------------------
 
-async def _proxy_mjpeg_stream(upstream_url: str, tag: str):
+async def _open_upstream_stream(upstream_url: str, tag: str):
     """
-    Générateur async : ouvre une connexion stream vers le hub,
-    yield chaque chunk au fur et à mesure.
+    Ouvre une connexion streaming vers le hub.
+    Retourne (client, upstream_response, content_type).
+    Le caller DOIT fermer client et response.
     """
     logger.warning("[%s] Connecting to: %s", tag, upstream_url)
-    timeout = httpx.Timeout(connect=5.0, read=30.0, write=5.0, pool=5.0)
-    async with httpx.AsyncClient(timeout=timeout) as client:
-        async with client.stream("GET", upstream_url) as response:
-            logger.warning("[%s] Connected OK status=%s content-type=%s",
-                           tag, response.status_code, response.headers.get("content-type"))
-            if response.status_code != 200:
-                raise httpx.HTTPStatusError(
-                    f"Upstream returned {response.status_code}",
-                    request=response.request, response=response
-                )
-            async for chunk in response.aiter_bytes():
-                yield chunk
+    client = httpx.AsyncClient(timeout=None)
+    try:
+        upstream = await client.send(
+            client.build_request("GET", upstream_url),
+            stream=True,
+        )
+        if upstream.status_code != 200:
+            await upstream.aclose()
+            await client.aclose()
+            logger.error("[%s] Upstream returned %s", tag, upstream.status_code)
+            raise HTTPException(status_code=502, detail=f"Upstream returned {upstream.status_code}")
+    except httpx.ConnectError as exc:
+        await client.aclose()
+        logger.error("[%s] Connect error: %s", tag, repr(exc))
+        raise HTTPException(status_code=503, detail=f"Stream hub unreachable: {exc}") from exc
+
+    content_type = upstream.headers.get(
+        "content-type",
+        "multipart/x-mixed-replace; boundary=BoundaryString",
+    )
+    logger.warning("[%s] Connected OK content-type=%s", tag, content_type)
+    return client, upstream, content_type
 
 
 @router.get("/stream")
@@ -98,23 +112,30 @@ async def stream(url: str = Query(None)):
     Si ?url= est fourni, on bypass pour test direct.
     """
     upstream_url = url if url else f"{STREAM_HUB_BASE}/stream/raw"
-    logger.warning("[CAM-STREAM] url=%s hub=%s", upstream_url, STREAM_HUB_BASE)
+    logger.warning("[CAM-STREAM] url=%s", upstream_url)
 
-    try:
-        # Teste que le hub répond avant de lancer le stream
-        async with httpx.AsyncClient(timeout=httpx.Timeout(5.0)) as client:
-            head = await client.get(f"{STREAM_HUB_BASE}/health")
-            logger.warning("[CAM-STREAM] Hub health=%s", head.status_code)
-    except Exception as exc:
-        logger.error("[CAM-STREAM] Hub unreachable: %s", repr(exc))
-        raise HTTPException(status_code=502, detail=f"Stream hub unreachable: {exc}") from exc
+    client, upstream, content_type = await _open_upstream_stream(upstream_url, "CAM-STREAM")
+
+    async def relay():
+        try:
+            async for chunk in upstream.aiter_bytes(chunk_size=4096):
+                yield chunk
+        except httpx.ReadTimeout:
+            logger.error("[CAM-STREAM] Read timeout")
+        except Exception as e:
+            logger.error("[CAM-STREAM] Error: %s", e)
+        finally:
+            await upstream.aclose()
+            await client.aclose()
+            logger.warning("[CAM-STREAM] Stream closed")
 
     return StreamingResponse(
-        _proxy_mjpeg_stream(upstream_url, "CAM-STREAM"),
-        media_type="multipart/x-mixed-replace; boundary=BoundaryString",
+        relay(),
+        media_type=content_type,
         headers={
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "Pragma": "no-cache",
+            "Expires": "0",
             "Connection": "keep-alive",
         },
     )
@@ -133,12 +154,28 @@ async def face_stream(filter_name: str = "blur"):
     upstream_url = f"{STREAM_HUB_BASE}/stream/{filter_name}"
     logger.warning("[CAM-FACE] filter=%s url=%s", filter_name, upstream_url)
 
+    client, upstream, content_type = await _open_upstream_stream(upstream_url, "CAM-FACE")
+
+    async def relay():
+        try:
+            async for chunk in upstream.aiter_bytes(chunk_size=4096):
+                yield chunk
+        except httpx.ReadTimeout:
+            logger.error("[CAM-FACE] Read timeout filter=%s", filter_name)
+        except Exception as e:
+            logger.error("[CAM-FACE] Error: %s", e)
+        finally:
+            await upstream.aclose()
+            await client.aclose()
+            logger.warning("[CAM-FACE] Stream closed filter=%s", filter_name)
+
     return StreamingResponse(
-        _proxy_mjpeg_stream(upstream_url, "CAM-FACE"),
-        media_type="multipart/x-mixed-replace; boundary=BoundaryString",
+        relay(),
+        media_type=content_type,
         headers={
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "Pragma": "no-cache",
+            "Expires": "0",
             "Connection": "keep-alive",
         },
     )
