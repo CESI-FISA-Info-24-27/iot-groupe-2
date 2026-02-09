@@ -11,6 +11,8 @@ export const API_ENDPOINTS = {
   health: `${API_BASE_URL}/health`,
   cameraSnapshot: `${API_BASE_URL}/api/camera/snapshot`,
   cameraStream: `${API_BASE_URL}/api/camera/stream`,
+  cameraFaceStream: (filter: string) =>
+    `${API_BASE_URL}/api/camera/face-stream/${filter}`,
   camera: `http://172.20.10.13/capture`, // Snapshot caméra
 };
 

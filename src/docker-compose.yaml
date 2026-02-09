@@ -12,6 +12,7 @@ services:
       - INFLUX_ORG=${INFLUXDB_INIT_ORG:?INFLUXDB_INIT_ORG manquant}
       - INFLUX_BUCKET=${INFLUXDB_INIT_BUCKET:?INFLUXDB_INIT_BUCKET manquant}
       - INFLUX_TOKEN=${INFLUXDB_INIT_ADMIN_TOKEN:?INFLUXDB_INIT_ADMIN_TOKEN manquant}
+      - STREAM_HUB_URL=http://face-detector:8890
     ports:
       - "${BACKEND_ORIGIN_PORT:?BACKEND_ORIGIN_PORT manquant}:${BACKEND_DEST_PORT:?BACKEND_DEST_PORT manquant}"
     volumes:
@@ -21,6 +22,8 @@ services:
       influxdb:
         condition: service_healthy
       mqtt-broker:
+        condition: service_healthy
+      face-detector:
         condition: service_healthy
     healthcheck:
       test:
@@ -77,6 +80,24 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  face-detector: # Stream hub : 1 ESP32 -> N clients (raw + face filters)
+    build: ./face-detector
+    container_name: face-detector
+    environment:
+      - ESP32_CAM_URL=${ESP32_CAM_STREAM_URL:-http://172.20.10.13:81/stream}
+      - HTTP_PORT=8890
+      - DETECTION_SKIP=5
+      - STREAM_WIDTH=640
+      - STREAM_HEIGHT=480
+    ports:
+      - "8890:8890"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8890/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   influxdb: # Base de données
     image: influxdb:2.7
