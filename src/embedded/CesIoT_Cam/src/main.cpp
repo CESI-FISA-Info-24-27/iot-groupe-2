@@ -1,6 +1,5 @@
 #include "esp_camera.h"
 #include <WiFi.h>
-#include <WiFiManager.h>
 
 // ===========================
 // CAMERA MODEL
@@ -8,21 +7,49 @@
 #define CAMERA_MODEL_AI_THINKER
 #include "camera_pins.h"
 
-#define CAMERA_IP       "10.75.92.253"
-#define CAMERA_GATEWAY  "10.75.92.23"
-#define CAMERA_SUBNET   "255.255.255.0"
+// ===== CONFIGURATION WIFI =====
+const char* WIFI_SSID = "Iphone13NRV";
+const char* WIFI_PASSWORD = "cesiot-0102";
+
+// ===== CONFIGURATION RESEAU =====
+#define CAMERA_IP "172.20.10.13"
+#define CAMERA_GATEWAY "172.20.10.1"
+#define CAMERA_SUBNET "255.255.255.0"
+
+// ===========================
+// PIR + SPEAKER
+// ===========================
+#define PIR_PIN 13
+#define SPEAKER_PIN 15
+#define PWM_CHANNEL 0
 
 void startCameraServer();
 void setupLedFlash();
 
+// Sirene
+void siren() {
+  for (int f = 1000; f < 2500; f += 120) {
+    ledcWriteTone(SPEAKER_PIN, f);
+    delay(15);
+  }
+  for (int f = 2500; f > 1000; f -= 120) {
+    ledcWriteTone(SPEAKER_PIN, f);
+    delay(15);
+  }
+  ledcWriteTone(SPEAKER_PIN, 0);
+}
+
 void setup() {
   Serial.begin(115200);
   Serial.setDebugOutput(false);
-  Serial.println();
 
-  // ===========================
-  // CAMERA CONFIG
-  // ===========================
+  pinMode(PIR_PIN, INPUT);
+
+  // Nouveau PWM (ESP32 core recent)
+  ledcAttach(PWM_CHANNEL, 2000, 8);
+  ledcAttachPin(SPEAKER_PIN, PWM_CHANNEL);
+
+  // ================= CAMERA CONFIG =================
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
   config.ledc_timer = LEDC_TIMER_0;
@@ -58,43 +85,39 @@ void setup() {
     config.fb_location = CAMERA_FB_IN_DRAM;
   }
 
-  esp_err_t err = esp_camera_init(&config);
-  if (err != ESP_OK) {
-    Serial.printf("Camera init failed: 0x%x\n", err);
+  if (esp_camera_init(&config) != ESP_OK) {
+    Serial.println("Camera init failed");
     return;
   }
 
-  // ===========================
-  // WIFI MANAGER
-  // ===========================
+  // ================= WIFI =================
   WiFi.mode(WIFI_STA);
   WiFi.setSleep(false);
 
-  WiFiManager wm;
-  wm.setConfigPortalTimeout(180);
+  IPAddress ip, gateway, subnet;
+  ip.fromString(CAMERA_IP);
+  gateway.fromString(CAMERA_GATEWAY);
+  subnet.fromString(CAMERA_SUBNET);
+  WiFi.config(ip, gateway, subnet);
 
-  Serial.println("Connexion WiFi...");
-  bool res = wm.autoConnect("ESP32-CAM-SETUP");
-
-  if (!res) 
-  {
-    Serial.println("Échec WiFi — redémarrage");
-    ESP.restart();
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
   }
 
-  Serial.println("WiFi connecté !");
-  Serial.print("IP : ");
+  Serial.println("\nWiFi connecte !");
   Serial.println(WiFi.localIP());
 
-  // ===========================
-  // START CAMERA SERVER
-  // ===========================
   startCameraServer();
-
-  Serial.print("Camera Ready! http://");
-  Serial.println(WiFi.localIP());
 }
 
 void loop() {
-  delay(10000);
+  if (digitalRead(PIR_PIN)) {
+    Serial.println("MOUVEMENT !");
+    for (int i = 0; i < 3; i++) {
+      siren();
+    }
+    delay(5000);
+  }
 }
