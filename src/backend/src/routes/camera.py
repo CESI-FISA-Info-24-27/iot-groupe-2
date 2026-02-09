@@ -9,8 +9,8 @@ from threading import Lock
 router = APIRouter(prefix="/api/camera", tags=["camera"])
 logger = logging.getLogger("camera")
 
-DEFAULT_SNAPSHOT_URL = "http://172.20.10.13/capture"
-DEFAULT_STREAM_URL = "http://172.20.10.13:81/stream"
+DEFAULT_SNAPSHOT_URL = "http://172.20.10.13/snapshot"
+DEFAULT_STREAM_URL = "http://172.20.10.13/stream"
 
 # ---------------------------------------------------------------------------
 # Stream hub: face-detector is the ONLY consumer of the ESP32 stream.

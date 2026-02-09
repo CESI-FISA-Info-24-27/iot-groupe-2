@@ -100,7 +100,7 @@ class FaceDetector:
     FILTERS = ["raw", "blur", "none", "grayscale", "edges", "nightvision", "thermal", "highcontrast"]
 
     def __init__(self):
-        self.esp32_url = os.getenv("ESP32_CAM_URL", "http://172.20.10.13:81/stream")
+        self.esp32_url = os.getenv("ESP32_CAM_URL", "http://172.20.10.13/stream")
         self.http_port = int(os.getenv("HTTP_PORT", "8890"))
         self.skip = int(os.getenv("DETECTION_SKIP", "5"))
         self.w = int(os.getenv("STREAM_WIDTH", "640"))
