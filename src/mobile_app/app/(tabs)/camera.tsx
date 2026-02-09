@@ -9,7 +9,11 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 const FILTERS = [
   { id: "none", label: "Normale", icon: "camera" as const },
   { id: "blur", label: "Vie privée", icon: "eye-off" as const },
-  { id: "grayscale", label: "Noir & Blanc", icon: "moon-waning-crescent" as const },
+  {
+    id: "grayscale",
+    label: "Noir & Blanc",
+    icon: "moon-waning-crescent" as const,
+  },
   { id: "edges", label: "Contours", icon: "vector-polyline" as const },
   { id: "nightvision", label: "Nuit", icon: "weather-night" as const },
   { id: "thermal", label: "Thermique", icon: "thermometer" as const },
@@ -39,11 +43,15 @@ export default function CameraScreen() {
         )}
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filterRow}
-      >
+      <View style={styles.streamContainer}>
+        <CameraStream
+          key={streamUrl}
+          streamUrl={streamUrl}
+          onErrorChange={setStreamError}
+        />
+      </View>
+
+      <View style={styles.filterRow}>
         {FILTERS.map((f) => {
           const active = f.id === activeFilter;
           return (
@@ -54,23 +62,17 @@ export default function CameraScreen() {
             >
               <MaterialCommunityIcons
                 name={f.icon}
-                size={16}
+                size={18}
                 color={active ? theme.colors.accent : theme.colors.textMuted}
               />
-              <Text style={[styles.chipLabel, active && styles.chipLabelActive]}>
+              <Text
+                style={[styles.chipLabel, active && styles.chipLabelActive]}
+              >
                 {f.label}
               </Text>
             </Pressable>
           );
         })}
-      </ScrollView>
-
-      <View style={styles.streamContainer}>
-        <CameraStream
-          key={streamUrl}
-          streamUrl={streamUrl}
-          onErrorChange={setStreamError}
-        />
       </View>
     </View>
   );
@@ -112,17 +114,22 @@ const getStyles = (theme: ReturnType<typeof useAppTheme>) =>
       marginTop: 4,
     },
     filterRow: {
-      paddingHorizontal: 16,
-      paddingBottom: 10,
-      gap: 8,
+      flexDirection: "row",
+      flexWrap: "wrap",
+      paddingHorizontal: 24,
+      paddingVertical: 16,
+      gap: 14,
+      marginLeft: 20,
+      justifyContent: "flex-start",
     },
     chip: {
-      flexDirection: "row",
+      width: "28%",
+      aspectRatio: 1,
+      flexDirection: "column",
       alignItems: "center",
+      justifyContent: "center",
       gap: 6,
-      paddingHorizontal: 14,
-      paddingVertical: 8,
-      borderRadius: 20,
+      borderRadius: 12,
       backgroundColor: theme.colors.surface,
       borderWidth: 1,
       borderColor: theme.colors.border,
@@ -132,16 +139,18 @@ const getStyles = (theme: ReturnType<typeof useAppTheme>) =>
       borderColor: theme.colors.accent,
     },
     chipLabel: {
-      fontSize: 12,
+      fontSize: 10,
       fontWeight: "500",
       color: theme.colors.textMuted,
+      textAlign: "center",
     },
     chipLabelActive: {
       color: theme.colors.accent,
     },
     streamContainer: {
       flex: 1,
-      margin: 16,
+      marginHorizontal: 16,
+      marginTop: 16,
       borderRadius: 12,
       overflow: "hidden",
       backgroundColor: theme.colors.surface,

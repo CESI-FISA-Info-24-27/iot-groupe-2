@@ -135,10 +135,15 @@ class FaceDetector:
         if name == "blur" or name is None:
             for x, y, w, h in self.faces:
                 try:
-                    roi = f[y:y+h, x:x+w]
+                    pad = int(max(w, h) * 0.2)
+                    x0 = max(0, x - pad)
+                    y0 = max(0, y - pad)
+                    x1 = min(f.shape[1], x + w + pad)
+                    y1 = min(f.shape[0], y + h + pad)
+                    roi = f[y0:y1, x0:x1]
                     roi = cv2.GaussianBlur(roi, (51, 51), 30)
                     roi = cv2.GaussianBlur(roi, (51, 51), 30)
-                    f[y:y+h, x:x+w] = roi
+                    f[y0:y1, x0:x1] = roi
                 except Exception:
                     pass
             return f
