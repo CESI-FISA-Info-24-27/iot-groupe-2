@@ -31,6 +31,7 @@ class ErrorResponse(BaseModel):
 async def get_history(
     sensor: Optional[str] = Query(None),
     room: Optional[str] = Query(None),
+    metric: Optional[str] = Query(None),
     range: str = Query("24h", alias="range")
 ):
     """
@@ -38,12 +39,14 @@ async def get_history(
     
     - **sensor**: Filter by sensor name (optional)
     - **room**: Filter by room name (optional)
+    - **metric**: Filter by metric tag (optional)
     - **range**: Time range (e.g., 24h, 7d, 1w) (default: 24h)
     """
     try:
         data = await influx_service.query_history(
             sensor=sensor,
             room=room,
+            metric=metric,
             range_time=range
         )
         return HistoryResponse(

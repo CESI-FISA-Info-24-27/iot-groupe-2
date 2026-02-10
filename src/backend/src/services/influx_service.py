@@ -44,6 +44,7 @@ class InfluxService:
         self,
         sensor: Optional[str] = None,
         room: Optional[str] = None,
+        metric: Optional[str] = None,
         range_time: str = "24h"
     ) -> List[Dict[str, Any]]:
         """Query historical sensor data from InfluxDB"""
@@ -55,6 +56,8 @@ class InfluxService:
             filters.append(f'r.sensor_id == "{sensor}"')
         if room:
             filters.append(f'r.room == "{room}"')
+        if metric:
+            filters.append(f'r.metric == "{metric}"')
 
         filter_clause = ""
         if filters:

@@ -97,6 +97,7 @@ export default function DashboardScreen() {
             <View style={[styles.cardWrap, isWide && styles.cardHalf]}>
               <SensorCard
                 config={SENSOR_CONFIGS.temperature}
+                sensorType="temperature"
                 value={data.temperature}
                 timestamp={data.timestamp}
               />
@@ -104,6 +105,7 @@ export default function DashboardScreen() {
             <View style={[styles.cardWrap, isWide && styles.cardHalf]}>
               <SensorCard
                 config={SENSOR_CONFIGS.pressure}
+                sensorType="pressure"
                 value={data.pressure}
                 timestamp={data.timestamp}
               />
@@ -111,6 +113,7 @@ export default function DashboardScreen() {
             <View style={[styles.cardWrap, isWide && styles.cardHalf]}>
               <SensorCard
                 config={SENSOR_CONFIGS.distance}
+                sensorType="distance"
                 value={data.distance}
                 timestamp={data.timestamp}
               />
@@ -118,6 +121,7 @@ export default function DashboardScreen() {
             <View style={[styles.cardWrap, isWide && styles.cardHalf]}>
               <SensorCard
                 config={SENSOR_CONFIGS.sound}
+                sensorType="sound"
                 value={data.sound}
                 timestamp={data.timestamp}
               />
