@@ -10,6 +10,7 @@ Endpoints:
   /stream/raw          -> raw stream (no processing)
   /stream/blur         -> face blur (default)
   /stream/none         -> alias for raw
+  /stream/quentin      -> overlay "quentin" on faces
   /stream/grayscale    -> B/W
   /stream/edges        -> Canny edges
   /stream/nightvision  -> green boost
@@ -97,7 +98,7 @@ class MJPEGStreamHandler(BaseHTTPRequestHandler):
 
 
 class FaceDetector:
-    FILTERS = ["raw", "blur", "none", "grayscale", "edges", "nightvision", "thermal", "highcontrast"]
+    FILTERS = ["raw", "blur", "none", "quentin", "grayscale", "edges", "nightvision", "thermal", "highcontrast"]
 
     def __init__(self):
         self.esp32_url = os.getenv("ESP32_CAM_URL", "http://172.20.10.13/stream")
@@ -106,6 +107,7 @@ class FaceDetector:
         self.w = int(os.getenv("STREAM_WIDTH", "640"))
         self.h = int(os.getenv("STREAM_HEIGHT", "480"))
         self.cascade = None
+        self.overlay_quentin = None
         self.frame = None
         self.count = 0
         self.faces = []
@@ -121,6 +123,17 @@ class FaceDetector:
                     return
         raise RuntimeError("haarcascade_frontalface_default.xml not found")
 
+    def load_assets(self):
+        asset_path = os.path.join(os.path.dirname(__file__), "assets", "quentin.png")
+        if os.path.exists(asset_path):
+            self.overlay_quentin = cv2.imread(asset_path, cv2.IMREAD_UNCHANGED)
+            if self.overlay_quentin is None:
+                print(f"Failed to load asset: {asset_path}", flush=True)
+            else:
+                print(f"Asset loaded: {asset_path}", flush=True)
+        else:
+            print(f"Asset not found: {asset_path}", flush=True)
+
     def detect(self, frame):
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         h, w = gray.shape
@@ -132,6 +145,31 @@ class FaceDetector:
 
     def apply_filter(self, frame, name):
         f = frame.copy()
+        if name == "quentin":
+            if self.overlay_quentin is None:
+                return f
+            for x, y, w, h in self.faces:
+                try:
+                    x0 = max(0, x)
+                    y0 = max(0, y)
+                    x1 = min(f.shape[1], x + w)
+                    y1 = min(f.shape[0], y + h)
+                    if x1 <= x0 or y1 <= y0:
+                        continue
+                    roi_w = x1 - x0
+                    roi_h = y1 - y0
+                    overlay = cv2.resize(self.overlay_quentin, (roi_w, roi_h), interpolation=cv2.INTER_LINEAR)
+                    if overlay.shape[2] == 4:
+                        alpha = overlay[:, :, 3] / 255.0
+                        for c in range(3):
+                            f[y0:y1, x0:x1, c] = (
+                                alpha * overlay[:, :, c] + (1.0 - alpha) * f[y0:y1, x0:x1, c]
+                            )
+                    else:
+                        f[y0:y1, x0:x1] = overlay[:, :, :3]
+                except Exception:
+                    pass
+            return f
         if name == "blur" or name is None:
             for x, y, w, h in self.faces:
                 try:
@@ -252,6 +290,7 @@ class FaceDetector:
         print(f"Source: {self.esp32_url}")
         print(f"{self.w}x{self.h} | detection 1/{self.skip} frames")
         self.load_cascade()
+        self.load_assets()
         self.start_server()
         while True:
             try:

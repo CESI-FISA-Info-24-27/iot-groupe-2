@@ -10,6 +10,7 @@ RUN apt-get update && \
 
 WORKDIR /app
 COPY face_detector.py .
+COPY assets ./assets
 
 EXPOSE 8890
 

@@ -17,7 +17,7 @@ DEFAULT_STREAM_URL = "http://172.20.10.13/stream"
 # Backend proxies everything through it (raw + filters).
 # ---------------------------------------------------------------------------
 STREAM_HUB_BASE = os.environ.get("STREAM_HUB_URL", "http://face-detector:8890")
-AVAILABLE_FILTERS = ["raw", "blur", "none", "grayscale", "edges", "nightvision", "thermal", "highcontrast"]
+AVAILABLE_FILTERS = ["raw", "blur", "none", "quentin", "grayscale", "edges", "nightvision", "thermal", "highcontrast"]
 
 _cache_lock = Lock()
 _last_frame = None
