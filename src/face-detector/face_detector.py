@@ -150,7 +150,7 @@ class FaceDetector:
                 return f
             for x, y, w, h in self.faces:
                 try:
-                    scale = 1.5
+                    scale = 2.5
                     extra_w = int((w * scale - w) / 2)
                     extra_h = int((h * scale - h) / 2)
                     x0 = max(0, x - extra_w)
