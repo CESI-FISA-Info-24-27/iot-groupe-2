@@ -14,6 +14,11 @@ const FILTERS = [
     label: "Noir & Blanc",
     icon: "moon-waning-crescent" as const,
   },
+  {
+    id: "quentin",
+    label: "Quentin",
+    icon: "format-color-highlight" as const,
+  },
   { id: "edges", label: "Contours", icon: "vector-polyline" as const },
   { id: "nightvision", label: "Nuit", icon: "weather-night" as const },
   { id: "thermal", label: "Thermique", icon: "thermometer" as const },

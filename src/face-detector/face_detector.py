@@ -150,10 +150,13 @@ class FaceDetector:
                 return f
             for x, y, w, h in self.faces:
                 try:
-                    x0 = max(0, x)
-                    y0 = max(0, y)
-                    x1 = min(f.shape[1], x + w)
-                    y1 = min(f.shape[0], y + h)
+                    scale = 1.5
+                    extra_w = int((w * scale - w) / 2)
+                    extra_h = int((h * scale - h) / 2)
+                    x0 = max(0, x - extra_w)
+                    y0 = max(0, y - extra_h)
+                    x1 = min(f.shape[1], x + w + extra_w)
+                    y1 = min(f.shape[0], y + h + extra_h)
                     if x1 <= x0 or y1 <= y0:
                         continue
                     roi_w = x1 - x0
